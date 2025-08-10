@@ -1,7 +1,6 @@
 import os
 import io
 from typing import List, Optional, Union
-from PyPDF2 import PdfReader
 from docx import Document
 from openpyxl import load_workbook
 import logging
