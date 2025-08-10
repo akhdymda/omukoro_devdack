@@ -5,7 +5,7 @@ from collections import Counter
 from datetime import datetime
 from app.models.analysis import AnalyticsRequest, AnalyticsResponse, ConsultantInfo, AnalysisMetadata
 from app.services.dummy_data_service import DummyDataService
-from app.services.rag_service import RAGService
+# from app.services.rag_service import RAGService
 
 logger = logging.getLogger(__name__)
 
@@ -18,27 +18,13 @@ class AnalyticsService:
     """
     
     def __init__(self):
-        # 🚨 ダミーデータサービスを使用（フォールバック用）
+    # ダミーデータサービスのみ使用
         self.dummy_service = DummyDataService()
-        
-        # 🆕 本格的なRAGサービス
-        try:
-            self.rag_service = RAGService()
-            self.use_rag = True
-            logger.info("✅ AnalyticsService initialized with full RAG system")
-        except Exception as e:
-            logger.error(f"❌ RAG service initialization failed: {e}")
-            self.rag_service = None
-            self.use_rag = False
-            logger.info("⚠️ Falling back to dummy data service")
-        
-        # RAG風推論のための設定（フォールバック用）
-        self.confidence_weights = {
-            "keyword_match": 0.3,
-            "regulation_coverage": 0.25,
-            "consultant_relevance": 0.25,
-            "content_quality": 0.2
-        }
+
+        # RAG は無効化
+        self.rag_service = None
+        self.use_rag = False
+        logger.info("RAG is disabled for deployment")
     
     async def analyze_consultation(self, request: AnalyticsRequest) -> AnalyticsResponse:
         """
