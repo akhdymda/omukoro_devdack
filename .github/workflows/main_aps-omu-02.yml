@@ -32,8 +32,8 @@ jobs:
       - name: Upgrade build tools
         run: pip install -U pip setuptools wheel
       
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install dependencies (no build isolation)
+        run: pip install --no-build-isolation -r requirements.txt
         
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
