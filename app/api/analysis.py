@@ -50,9 +50,6 @@ async def analyze_input(request: AnalysisRequest):
                 confidence=1.0
             )
         
-        # テキストの長さチェック（極端に長い場合は制限）
-        # 長文はサービス側で6000文字にクリップするため、ここでは制限しない
-        
         # 分析実行
         result = await analysis_service.analyze_input_completeness(request)
         return result
@@ -61,88 +58,11 @@ async def analyze_input(request: AnalysisRequest):
         # HTTPExceptionはそのまま再送出
         raise
     except Exception as e:
-        print(f"Analysis error: {e}")
+        logger.error(f"Analysis error: {e}")
         raise HTTPException(
             status_code=500,
             detail="分析処理中にエラーが発生しました"
         )
-
-@router.post("/extract_text", response_model=ExtractTextResponse)
-async def extract_text(files: List[UploadFile] = File(..., alias="files[]")):
-    """
-    Word(.docx)/Excel(.xlsx) の複数ファイルからテキスト抽出
-
-    制限:
-      - 1ファイル最大10MB
-      - 同時最大3ファイル
-      - 対応拡張子: .docx/.xlsx のみ
-    """
-    try:
-        # ファイル数バリデーション
-        document_service.validate_file_count(0, new_files_count=len(files))
-
-        extracted_parts: List[str] = []
-        file_infos: List[ExtractedFileInfo] = []
-
-        for f in files:
-            content = await f.read()
-            # バリデーション
-            document_service.validate_file(f.filename or "", len(content))
-            # 抽出
-            text = await document_service.extract_text_from_file(content, f.filename or "")
-            extracted_parts.append(text)
-            file_infos.append(ExtractedFileInfo(name=f.filename or "", bytes=len(content)))
-
-        combined_text = "\n\n".join([t for t in extracted_parts if t and t.strip()])
-        return ExtractTextResponse(extractedText=combined_text, files=file_infos)
-    except Exception as e:
-        logger.error(f"extract_text error: {e}")
-        raise HTTPException(status_code=500, detail=f"ファイル抽出中にエラーが発生しました: {str(e)}")
-    
-# ファイル内容を含む分析エンドポイント
-@router.post("/analyze-with-files", response_model=AnalysisResponse)
-async def analyze_with_files(request: FileAnalysisRequest):
-    """
-    手動入力テキストとファイル抽出テキストを組み合わせて分析する
-    
-    Args:
-        request: 分析リクエスト
-
-    Returns:
-        AnalysisResponse: 分析結果
-    """
-    try:
-        # 手動入力テキストとファイル抽出テキストを組み合わせて分析
-        combined_text = ""
-
-        if request.text and request.text.strip():
-            combined_text += request.text.strip() + "\n\n"
-
-        if request.files_content:
-            for i, file_content in enumerate(request.files_content):
-                if file_content.strip():
-                    combined_text += f"[資料 {i+1}]\n" + file_content.strip() + "\n\n"
-        
-        if not combined_text.strip():
-            return AnalysisResponse(
-                completeness=0,
-                suggestions=["相談内容または資料を入力してください"],
-                confidence=1.0
-            )
-        
-        # 通常の分析処理を実行
-        analysis_request = AnalysisRequest(text=combined_text.strip())
-        result = await analysis_service.analyze_input_completeness(analysis_request)
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"File analysis error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="ファイル内容の分析中にエラーが発生しました"
-        )
-
 
 @router.get("/analyze/test")
 async def test_analysis():
@@ -163,56 +83,4 @@ async def test_analysis():
         return {
             "message": "テスト実行失敗",
             "error": str(e)
-        } 
-
-# 🆕 新規追加：論点・質問事項と相談先の分析エンドポイント
-@router.post("/analytics", response_model=AnalyticsResponse)
-async def analyze_consultation(request: AnalyticsRequest):
-    """
-    相談内容を分析して論点・質問事項・相談先を提供する
-    
-    Args:
-        request: Analytics分析リクエスト
-        
-    Returns:
-        AnalyticsResponse: 論点・質問事項・相談先の分析結果
-        
-    Raises:
-        HTTPException: 分析エラーの場合
-    """
-    try:
-        logger.info(f"Analytics API呼び出し: テキスト長{len(request.text)}, ファイル数{len(request.files_content or [])}")
-        
-        # 分析実行
-        result = await analytics_service.analyze_consultation(request)
-        
-        logger.info(f"Analytics API完了: 論点{len(result.questions)}件, 相談先{len(result.consultants)}名")
-        return result
-        
-    except ValueError as e:
-        # 入力エラー
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Analytics API error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="論点分析処理中にエラーが発生しました"
-        )
-
-# 🆕 デバッグ用：ダミーデータ情報取得エンドポイント
-@router.get("/analytics/dummy-info")
-async def get_dummy_data_info():
-    """
-    ダミーデータの情報を取得（開発・テスト用）
-    
-    🚨 本番環境では削除予定
-    """
-    try:
-        info = await analytics_service.get_dummy_data_info()
-        return info
-    except Exception as e:
-        logger.error(f"Dummy data info error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="ダミーデータ情報の取得に失敗しました"
-        )
+        }

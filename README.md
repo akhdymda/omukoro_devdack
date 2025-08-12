@@ -1,97 +1,87 @@
-## Sherpath Backend (FastAPI)
+# Sherpath API (統合版)
 
-本リポジトリは「リアルタイム入力分析機能」を備えた Sherpath のバックエンド（FastAPI）です。企画テキストと添付資料（.docx/.xlsx）から不足情報を提示し、5段階の完成度を返します。Azure Cache for Redis によるキャッシュに対応しています。
+omukoro_devdack_clone と sherpath_backend の機能を統合したバックエンドAPIです。
 
-### 主なエンドポイント
-- POST `/api/analyze`
-  - リクエスト: `{ text: string, docText?: string }`
-  - レスポンス: `{ completeness: 1-5, suggestions: string[], confidence: number }`
-  - 概要: 入力テキストと抽出テキストを統合して、ルール＋AIのハイブリッドで評価します。
+## 機能
 
-- POST `/api/extract_text`
-  - フォーム: `files[]`（.docx/.xlsx、最大3ファイル、各10MB）
-  - レスポンス: `{ extractedText: string, files: [{ name: string, bytes: number }] }`
-  - 概要: Word/Excel のテキスト抽出（OCRは不使用）
+- **企画案分析**: テキストの充実度を分析
+- **法令検索**: Cosmos DBを使用したベクトル検索
+- **相談提案生成**: OpenAI APIを使用した相談内容分析
+- **ヘルスチェック**: 各サービスの状態確認
 
-- POST `/api/analytics`
-  - 概要: 相談内容から論点・質問・相談先を提示（将来のRAG強化も想定）
+## 技術スタック
 
-### 仕組み（要点）
-- ルールベース判定（`app/utils/rule_analyzer.py`）
-  - 商品/ターゲット/予算/スケジュール/目的/市場 の6分類のキーワードで即時評価
-- AI判定（`app/services/analysis_service.py`）
-  - OpenAI APIで構造化提案を生成し、ルール結果と統合
-- スコアリング（5段階）
-  - 0–1スコアへ正規化し、しきい値で 1–5 にマッピング
-- キャッシュ
-  - キー: `sha256(text + "\n\n" + docText)`、TTL=1時間
-  - バックエンド: Azure Cache for Redis（`redis.asyncio`）
+- **FastAPI**: 0.104.1
+- **Python**: 3.8+
+- **データベース**: Cosmos DB (MongoDB API)
+- **キャッシュ**: Redis
+- **AI**: OpenAI API
 
-### 環境変数（Azure Redis）
-以下のいずれかで設定してください。
+## セットアップ
 
-1) URLで一括指定（推奨）
-- `REDIS_URL=rediss://:<PASSWORD>@<HOST>:6380/0`
+### 1. 依存関係のインストール
 
-2) 個別指定
-- `REDIS_HOST=redis-OMU.redis.cache.windows.net`
-- `REDIS_PORT=6380`
-- `REDIS_DB=0`
-- `REDIS_SSL=True`
-- `REDIS_PASSWORD=<your password>`
-
-任意: `TOKENIZERS_PARALLELISM=false`（HuggingFaceの並列警告抑止）
-
-### セットアップ
-1) Python環境（推奨: プロジェクト専用venv）
-```
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
+```bash
 pip install -r requirements.txt
 ```
 
-2) 起動
-```
-uvicorn main:app --reload --port 8000
-```
+### 2. 環境変数の設定
 
-3) 動作チェック
-```
-curl -X POST http://localhost:8000/api/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"text":"新商品の販促。ターゲットは20代、8月実施、目的は新規獲得、予算1000万。"}'
+`env.example` を `.env` にコピーして、必要な値を設定してください：
 
-curl -X POST http://localhost:8000/api/extract_text \
-  -F "files[]=@/path/to/plan.docx" -F "files[]=@/path/to/estimation.xlsx"
+```bash
+cp env.example .env
 ```
 
-### ディレクトリ構成（概要）
-```
-app/
-  api/
-    analysis.py        # /api/analyze, /api/extract_text, /api/analytics
-    health.py          # /api/health
-  services/
-    analysis_service.py    # 正規化・5段階スコア・キャッシュ
-    analytics_service.py   # 論点・質問・相談先（RAG想定）
-    cache_service.py       # Azure Redis接続（redis.asyncio）
-    ocr_service.py         # .docx/.xlsx テキスト抽出
-    rag_service.py         # RAG機構の土台
-    dummy_data_service.py  # ダミーデータ
-  models/
-    analysis.py        # Pydanticモデル（Analyze/Extract/Analytics）
-  utils/
-    rule_analyzer.py   # ルールベース判定
-main.py                # FastAPIエントリ
-requirements.txt
-仕様書.md
+必要な環境変数：
+- `OPENAI_API_KEY`: OpenAI APIキー
+- `MONGODB_CONNECTION_STRING`: Cosmos DB接続文字列
+- `REDIS_URL`: Redis接続URL
+
+### 3. アプリケーションの起動
+
+```bash
+python main.py
 ```
 
-### よくあるエラーと対処
-- Redis接続エラー（invalid literal for int() with base 10: 'redis-OMU'）
-  - `REDIS_DB` は整数（例: `0`）で指定。`REDIS_URL` 指定も可。
-- huggingface_hub の `cached_download` ImportError
-  - 依存を同一環境に統一。必要に応じて `sentence-transformers>=2.5.1` などへ更新。
+または
 
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
+## API エンドポイント
+
+### 分析関連
+- `POST /api/analyze`: テキストの充実度分析
+- `GET /api/analyze/test`: 分析機能のテスト
+
+### 相談関連
+- `POST /api/consultations/generate-suggestions`: 相談提案生成
+- `GET /api/consultations/{consultation_id}`: 相談詳細取得
+- `GET /api/consultations/{consultation_id}/regulations`: 関連法令取得
+
+### システム
+- `GET /api/health`: ヘルスチェック
+- `GET /`: ルート情報
+- `GET /info`: アプリケーション情報
+
+## プロジェクト構造
+
+```
+omukoro_devdack_test/
+├── app/
+│   ├── api/           # APIルーター
+│   ├── models/        # Pydanticモデル
+│   ├── services/      # ビジネスロジック
+│   └── utils/         # ユーティリティ
+├── main.py            # メインアプリケーション
+├── requirements.txt   # 依存関係
+└── README.md         # このファイル
+```
+
+## 注意事項
+
+- Cosmos DBへの接続が必要です
+- OpenAI APIキーの設定が必要です
+- Redisはオプションですが、キャッシュ機能を使用する場合は必要です

@@ -1,151 +1,115 @@
 import re
-from typing import Dict, List, Tuple
-from app.models.analysis import RuleAnalysisResult
+from typing import Dict, List
 
 class RuleBasedAnalyzer:
-    """
-    ルールベースによるテキスト分析クラス
-    """
+    """ルールベース分析を行うクラス"""
     
     def __init__(self):
-        # 各カテゴリのキーワードパターンを定義
-        self.keywords = {
-            'product': {
-                'patterns': [r'商品', r'サービス', r'製品', r'プロダクト', r'システム', r'アプリ'],
-                'name': '商品・サービス内容'
+        # 分析ルールの定義
+        self.rules = {
+            'market_analysis': {
+                'keywords': ['市場', 'ターゲット', '顧客', 'ニーズ', 'トレンド', '成長率'],
+                'weight': 0.2
             },
-            'target': {
-                'patterns': [r'対象', r'ターゲット', r'顧客', r'ユーザー', r'利用者', r'お客様'],
-                'name': '対象顧客・ターゲット'
+            'competitor_analysis': {
+                'keywords': ['競合', '競合他社', '差別化', '強み', '弱み', 'シェア'],
+                'weight': 0.2
             },
-            'budget': {
-                'patterns': [r'予算', r'コスト', r'費用', r'価格', r'料金', r'投資'],
-                'name': '予算・コスト情報'
+            'business_model': {
+                'keywords': ['収益', '売上', '利益', 'コスト', '価格', '収益モデル'],
+                'weight': 0.2
             },
-            'timeline': {
-                'patterns': [r'期間', r'スケジュール', r'時期', r'予定', r'納期', r'リリース'],
-                'name': 'スケジュール・時期'
+            'risk_analysis': {
+                'keywords': ['リスク', '課題', '問題', '懸念', '対策', '予防'],
+                'weight': 0.2
             },
-            'purpose': {
-                'patterns': [r'目的', r'目標', r'ゴール', r'狙い', r'効果', r'成果'],
-                'name': '目的・目標'
-            },
-            'market': {
-                'patterns': [r'市場', r'業界', r'競合', r'マーケット', r'需要'],
-                'name': '市場・競合分析'
+            'implementation': {
+                'keywords': ['実行', '計画', 'スケジュール', 'マイルストーン', 'アクション', '実施'],
+                'weight': 0.2
             }
         }
-        
-        # 最低文字数の閾値
-        self.min_length_basic = 30    # 基本情報
-        self.min_length_detail = 100  # 詳細情報
     
-    def analyze_text(self, text: str) -> RuleAnalysisResult:
+    def analyze_text(self, text: str) -> Dict:
         """
-        テキストをルールベースで分析する
+        テキストを分析して充実度を評価
         
         Args:
             text: 分析対象のテキスト
             
         Returns:
-            RuleAnalysisResult: 分析結果
+            Dict: 分析結果
         """
-        found_categories = []
-        missing_categories = []
+        if not text or len(text.strip()) == 0:
+            return {
+                'completeness': 1,
+                'suggestions': ['テキストが入力されていません'],
+                'confidence': 1.0
+            }
         
-        # 各カテゴリのキーワードをチェック
-        for category, info in self.keywords.items():
-            if self._has_keyword(text, info['patterns']):
-                found_categories.append(category)
-            else:
-                missing_categories.append(category)
+        # 各カテゴリのスコアを計算
+        category_scores = {}
+        total_score = 0
         
-        # スコア計算（0-2の3段階）
-        score = self._calculate_score(text, len(found_categories))
+        for category, rule in self.rules.items():
+            score = self._calculate_category_score(text, rule['keywords'])
+            category_scores[category] = score
+            total_score += score * rule['weight']
         
-        # 不足している要素をユーザー向けのメッセージに変換
-        missing_elements = [
-            self.keywords[cat]['name'] 
-            for cat in missing_categories[:5]  # 最大5つまで表示
-        ]
+        # 充実度スコアを1-5の範囲に正規化
+        completeness = max(1, min(5, int(round(total_score * 5))))
         
-        # 文字数が不足している場合は追加
-        if len(text) < self.min_length_basic:
-            missing_elements.append('より詳細な説明')
+        # 改善提案を生成
+        suggestions = self._generate_suggestions(category_scores)
         
-        return RuleAnalysisResult(
-            found_categories=found_categories,
-            missing_categories=missing_categories,
-            score=score,
-            missing_elements=missing_elements
-        )
+        # 信頼度を計算
+        confidence = min(1.0, 0.5 + (total_score * 0.5))
+        
+        return {
+            'completeness': completeness,
+            'suggestions': suggestions,
+            'confidence': confidence,
+            'category_scores': category_scores
+        }
     
-    def _has_keyword(self, text: str, patterns: List[str]) -> bool:
-        """
-        テキスト内にキーワードパターンが含まれているかチェック
+    def _calculate_category_score(self, text: str, keywords: List[str]) -> float:
+        """カテゴリごとのスコアを計算"""
+        score = 0.0
+        text_lower = text.lower()
         
-        Args:
-            text: チェック対象のテキスト
-            patterns: 検索パターンのリスト
-            
-        Returns:
-            bool: パターンが見つかった場合True
-        """
-        for pattern in patterns:
-            if re.search(pattern, text):
-                return True
-        return False
+        for keyword in keywords:
+            if keyword.lower() in text_lower:
+                score += 1.0
+        
+        # キーワードの出現回数も考慮
+        for keyword in keywords:
+            count = len(re.findall(keyword.lower(), text_lower))
+            if count > 1:
+                score += min(0.5, count * 0.1)
+        
+        return min(1.0, score / len(keywords))
     
-    def _calculate_score(self, text: str, found_count: int) -> int:
-        """
-        スコアを計算する（0-2の3段階）
-        
-        Args:
-            text: 分析対象のテキスト
-            found_count: 見つかったカテゴリ数
-            
-        Returns:
-            int: スコア（0-2）
-        """
-        text_length = len(text)
-        
-        # 文字数が極端に少ない場合は0
-        if text_length < self.min_length_basic:
-            return 0
-        
-        # カテゴリ数と文字数を組み合わせて判定
-        if found_count >= 4 and text_length >= self.min_length_detail:
-            return 2  # 詳細
-        elif found_count >= 2 and text_length >= self.min_length_basic:
-            return 1  # 中程度
-        else:
-            return 0  # 不足
-    
-    def get_improvement_suggestions(self, analysis_result: RuleAnalysisResult) -> List[str]:
-        """
-        改善提案を生成する
-        
-        Args:
-            analysis_result: 分析結果
-            
-        Returns:
-            List[str]: 改善提案のリスト
-        """
+    def _generate_suggestions(self, category_scores: Dict[str, float]) -> List[str]:
+        """改善提案を生成"""
         suggestions = []
         
-        # 不足しているカテゴリに基づいて具体的な提案を生成
-        for category in analysis_result.missing_categories[:3]:  # 上位3つ
-            if category == 'product':
-                suggestions.append('どのような商品・サービスなのか具体的に記載してください')
-            elif category == 'target':
-                suggestions.append('ターゲットとなる顧客層を明確にしてください')
-            elif category == 'budget':
-                suggestions.append('予算の規模や制約条件を記載してください')
-            elif category == 'timeline':
-                suggestions.append('スケジュールや期限を明確にしてください')
-            elif category == 'purpose':
-                suggestions.append('何を目的として実施するのかを明確にしてください')
-            elif category == 'market':
-                suggestions.append('対象市場や競合の状況を記載してください')
+        # スコアが低いカテゴリについて提案を生成
+        if category_scores.get('market_analysis', 0) < 0.5:
+            suggestions.append('市場分析の詳細化が必要です')
         
-        return suggestions 
+        if category_scores.get('competitor_analysis', 0) < 0.5:
+            suggestions.append('競合分析の強化が必要です')
+        
+        if category_scores.get('business_model', 0) < 0.5:
+            suggestions.append('収益モデルの明確化が必要です')
+        
+        if category_scores.get('risk_analysis', 0) < 0.5:
+            suggestions.append('リスク分析の追加が必要です')
+        
+        if category_scores.get('implementation', 0) < 0.5:
+            suggestions.append('実行計画の具体化が必要です')
+        
+        # デフォルトの提案
+        if not suggestions:
+            suggestions.append('全体的に充実した内容です')
+        
+        return suggestions[:3]  # 最大3件

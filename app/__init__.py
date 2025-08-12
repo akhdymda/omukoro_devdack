@@ -1,1 +1,1 @@
-# Sherpath Backend Application 
+# Sherpath Backend Application Package

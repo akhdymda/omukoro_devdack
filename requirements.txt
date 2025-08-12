@@ -11,3 +11,10 @@ passlib[bcrypt]==1.7.4
 aiofiles==23.2.1 
 python-docx==1.1.0
 openpyxl==3.1.2
+# Cosmos DB接続用
+pymongo
+# ベクトル検索用
+rank-bm25
+nltk
+numpy<2.0.0
+scikit-learn

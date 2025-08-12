@@ -1,138 +1,77 @@
-import pickle
-from typing import Optional, Any
+import json
+import hashlib
+from typing import Optional
 from app.config import settings
-from redis.asyncio import Redis as AsyncRedis
-import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CacheService:
-    """
-    Redis を使用したキャッシュサービス
-    """
+    """Redisを使用したキャッシュサービス"""
     
     def __init__(self):
-        self._redis = None
+        self.redis_client = None
+        self._initialize_redis()
     
-    async def _get_redis(self):
-        """
-        Redis接続を取得（遅延初期化）
-        """
-        if self._redis is None:
-            try:
-                # 優先: REDIS_URL（例: rediss://:<password>@<host>:6380/0）
-                redis_url = os.getenv("REDIS_URL", "")
-                if redis_url:
-                    self._redis = AsyncRedis.from_url(redis_url, decode_responses=False)
-                else:
-                    host = settings.redis_host
-                    port = settings.redis_port
-                    db = int(os.getenv("REDIS_DB", settings.redis_db))
-                    password = os.getenv("REDIS_PASSWORD", "")
-                    use_ssl = str(os.getenv("REDIS_SSL", "False")).lower() == "true"
-                    self._redis = AsyncRedis(
-                        host=host,
-                        port=port,
-                        db=db,
-                        password=password or None,
-                        ssl=use_ssl,
-                        decode_responses=False,
-                    )
-                # 接続テスト
-                await self._redis.ping()
-            except Exception as e:
-                print(f"Redis connection failed: {e}")
-                # Redis接続に失敗した場合はメモリキャッシュにフォールバック
-                self._redis = MemoryCache()
-        
-        return self._redis
-    
-    async def get(self, key: str) -> Optional[Any]:
-        """
-        キーに対応する値を取得
-        
-        Args:
-            key: キー
-            
-        Returns:
-            Any: 値（存在しない場合はNone）
-        """
+    def _initialize_redis(self):
+        """Redis接続を初期化"""
         try:
-            redis_client = await self._get_redis()
-            data = await redis_client.get(key)
+            import redis
+            self.redis_client = redis.from_url(settings.redis_url)
+            # 接続テスト
+            self.redis_client.ping()
+            logger.info("Redis接続完了")
+        except Exception as e:
+            logger.warning(f"Redis接続失敗: {e}")
+            self.redis_client = None
+    
+    async def get_analysis_result(self, text: str) -> Optional[dict]:
+        """分析結果をキャッシュから取得"""
+        if not self.redis_client:
+            return None
+        
+        try:
+            cache_key = self._generate_cache_key(text)
+            cached_data = self.redis_client.get(cache_key)
             
-            if data is None:
-                return None
+            if cached_data:
+                return json.loads(cached_data)
             
-            # pickleでデシリアライゼーション
-            return pickle.loads(data)
+            return None
             
         except Exception as e:
-            print(f"Cache get error: {e}")
+            logger.error(f"キャッシュ取得エラー: {e}")
             return None
     
-    async def set(self, key: str, value: Any, expire_seconds: int = 3600) -> bool:
-        """
-        キーと値をキャッシュに保存
+    async def set_analysis_result(self, text: str, result: dict, ttl: int = 3600):
+        """分析結果をキャッシュに保存"""
+        if not self.redis_client:
+            return
         
-        Args:
-            key: キー
-            value: 値
-            expire_seconds: 有効期限（秒）
-            
-        Returns:
-            bool: 保存成功時True
-        """
         try:
-            redis_client = await self._get_redis()
-            
-            # pickleでシリアライゼーション
-            data = pickle.dumps(value)
-            
-            await redis_client.setex(key, expire_seconds, data)
-            return True
+            cache_key = self._generate_cache_key(text)
+            self.redis_client.setex(
+                cache_key,
+                ttl,
+                json.dumps(result, ensure_ascii=False)
+            )
+            logger.debug(f"キャッシュ保存完了: {cache_key}")
             
         except Exception as e:
-            print(f"Cache set error: {e}")
-            return False
+            logger.error(f"キャッシュ保存エラー: {e}")
     
-    async def delete(self, key: str) -> bool:
-        """
-        キーを削除
-        
-        Args:
-            key: キー
-            
-        Returns:
-            bool: 削除成功時True
-        """
+    def _generate_cache_key(self, text: str) -> str:
+        """キャッシュキーを生成"""
+        hash_object = hashlib.md5(text.encode())
+        return f"analysis_{hash_object.hexdigest()}"
+    
+    def get_health_status(self) -> dict:
+        """ヘルスチェック用の状態を取得"""
         try:
-            redis_client = await self._get_redis()
-            result = await redis_client.delete(key)
-            return result > 0
-            
-        except Exception as e:
-            print(f"Cache delete error: {e}")
-            return False
-
-class MemoryCache:
-    """
-    Redisが利用できない場合のメモリキャッシュ
-    """
-    
-    def __init__(self):
-        self._cache = {}
-    
-    async def get(self, key: str) -> Optional[Any]:
-        return self._cache.get(key)
-    
-    async def setex(self, key: str, seconds: int, value: Any) -> None:
-        self._cache[key] = value
-        # 簡易実装のため有効期限は実装しない
-    
-    async def delete(self, key: str) -> int:
-        if key in self._cache:
-            del self._cache[key]
-            return 1
-        return 0
-    
-    async def ping(self) -> bool:
-        return True 
+            if self.redis_client:
+                self.redis_client.ping()
+                return {"redis_connected": True}
+            else:
+                return {"redis_connected": False}
+        except Exception:
+            return {"redis_connected": False}
