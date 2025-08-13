@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
 
 class Settings(BaseSettings):
     # OpenAI設定
@@ -9,9 +10,16 @@ class Settings(BaseSettings):
     mongodb_connection_string: Optional[str] = None
     mongo_db: str = "vector_legal_rag"
     mongo_collection: str = "alctax_act_chunks"
+
+    # アプリケーション設定
+    secret_key: str = os.getenv("SECRET_KEY", "your-secret-key")
+    algorithm: str = os.getenv("ALGORITHM", "HS256")
+    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     
     # Redis設定
-    redis_url: str = "redis://localhost:6379"
+    redis_host: str = os.getenv("REDIS_HOST", "localhost")
+    redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
+    redis_db: int = int(os.getenv("REDIS_DB", "0"))
     
     # アプリケーション設定
     app_name: str = "Sherpath API"
