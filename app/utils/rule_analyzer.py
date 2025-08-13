@@ -15,10 +15,6 @@ class RuleBasedAnalyzer:
                 'keywords': ['競合', '競合他社', '差別化', '強み', '弱み', 'シェア'],
                 'weight': 0.2
             },
-            'business_model': {
-                'keywords': ['収益', '売上', '利益', 'コスト', '価格', '収益モデル'],
-                'weight': 0.2
-            },
             'risk_analysis': {
                 'keywords': ['リスク', '課題', '問題', '懸念', '対策', '予防'],
                 'weight': 0.2
