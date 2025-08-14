@@ -11,6 +11,51 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 consultation_service = ConsultationService()
 
+@router.get("/consultations")
+async def get_consultations(
+    tenant_id: Optional[str] = Query(None, description="テナントID"),
+    user_id: Optional[str] = Query(None, description="ユーザーID"),
+    limit: int = Query(20, ge=1, le=100, description="取得件数"),
+    offset: int = Query(0, ge=0, description="オフセット")
+):
+    """
+    相談一覧を取得する
+    
+    Args:
+        tenant_id: テナントID（指定時はそのテナントの相談のみ）
+        user_id: ユーザーID（指定時はそのユーザーの相談のみ）
+        limit: 取得件数（デフォルト: 20）
+        offset: オフセット（デフォルト: 0）
+        
+    Returns:
+        dict: 相談一覧と総件数
+    """
+    try:
+        # 検索条件なしで全件取得
+        consultations = await mysql_service.search_consultations(
+            query=None,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            industry_categories=None,
+            alcohol_types=None,
+            limit=limit,
+            offset=offset
+        )
+        
+        return {
+            "consultations": consultations,
+            "total_count": len(consultations),
+            "limit": limit,
+            "offset": offset
+        }
+        
+    except Exception as e:
+        logger.error(f"相談一覧取得エラー: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="相談一覧の取得中にエラーが発生しました"
+        )
+
 @router.post("/consultations/generate-suggestions")
 async def generate_suggestions(text: str = Form(...)):
     """

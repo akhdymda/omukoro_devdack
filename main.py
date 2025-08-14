@@ -56,7 +56,12 @@ async def get_info():
         "description": "omukoro_devdack_clone + sherpath_backend の統合版",
         "endpoints": {
             "analysis": "/api/analyze",
-            "consultations": "/api/consultations",
+            "consultations": {
+                "list": "/api/consultations",
+                "detail": "/api/consultations/{id}",
+                "search": "/api/consultations/search",
+                "generate": "/api/consultations/generate-suggestions"
+            },
             "master_data": {
                 "industries": "/api/master/industries",
                 "alcohol_types": "/api/master/alcohol-types"
