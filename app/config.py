@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     # Redis設定
     redis_url: str = "redis://localhost:6379"
     
+    # MySQL設定
+    mysql_host: Optional[str] = None
+    mysql_port: int = 3306
+    mysql_user: Optional[str] = None
+    mysql_password: Optional[str] = None
+    mysql_database: Optional[str] = None
+    
     # アプリケーション設定
     app_name: str = "Sherpath API"
     app_version: str = "1.0.0"
