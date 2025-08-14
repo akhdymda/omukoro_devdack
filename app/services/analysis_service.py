@@ -164,10 +164,10 @@ class AnalysisService:
         ai_score = ai_result.get('ai_score', 3) if ai_result else 3
         
         # 重み付き平均（ルールベース: 0.7, AI: 0.3）
-        final_score = int(round(rule_score * 0.7 + ai_score * 0.3))
+        final_score = int(round(rule_score * 0.5 + ai_score * 0.5))
         
         # 提案を統合
-        suggestions = rule_result.get('suggestions', [])
+        suggestions = []
         if ai_result and ai_result.get('ai_suggestions'):
             suggestions.extend(ai_result['ai_suggestions'])
         
@@ -181,10 +181,16 @@ class AnalysisService:
             confidence=confidence
         )
     
+    def _get_cache_key(self, text: str) -> str:
+        """テキストからキャッシュキーを生成"""
+        hash_object = hashlib.sha256(text.encode())
+        return f"analysis_result:{hash_object.hexdigest()}"
+    
     async def _get_cached_result(self, text: str) -> Optional[AnalysisResponse]:
         """キャッシュから結果を取得"""
         try:
-            return await self.cache_service.get_analysis_result(text)
+            cache_key = self._get_cache_key(text)
+            return await self.cache_service.get(cache_key)
         except Exception as e:
             logger.error(f"キャッシュ取得エラー: {e}")
             return None
@@ -192,6 +198,7 @@ class AnalysisService:
     async def _cache_result(self, text: str, result: AnalysisResponse):
         """結果をキャッシュに保存"""
         try:
-            await self.cache_service.set_analysis_result(text, result)
+            cache_key = self._get_cache_key(text)
+            await self.cache_service.set(cache_key, result)
         except Exception as e:
             logger.error(f"キャッシュ保存エラー: {e}")
