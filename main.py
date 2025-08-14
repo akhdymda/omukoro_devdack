@@ -57,6 +57,10 @@ async def get_info():
         "endpoints": {
             "analysis": "/api/analyze",
             "consultations": "/api/consultations",
+            "master_data": {
+                "industries": "/api/master/industries",
+                "alcohol_types": "/api/master/alcohol-types"
+            },
             "health": "/api/health"
         }
     }

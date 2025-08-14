@@ -143,26 +143,44 @@ async def search_consultations(
             detail="検索中にエラーが発生しました"
         )
 
-@router.get("/consultations/search/filters", response_model=SearchFiltersResponse)
-async def get_search_filters():
+@router.get("/master/industries")
+async def get_industry_categories():
     """
-    検索フィルタのオプションを取得する
+    業界カテゴリマスタを取得する
     
     Returns:
-        SearchFiltersResponse: フィルタオプション
+        List[Dict]: 業界カテゴリ一覧
     """
     try:
         industry_categories = await mysql_service.get_industry_categories()
-        alcohol_types = await mysql_service.get_alcohol_types()
-        
-        return SearchFiltersResponse(
-            industry_categories=industry_categories,
-            alcohol_types=alcohol_types
-        )
+        return {
+            "industries": industry_categories
+        }
         
     except Exception as e:
-        logger.error(f"フィルタ取得エラー: {e}")
+        logger.error(f"業界カテゴリ取得エラー: {e}")
         raise HTTPException(
             status_code=500,
-            detail="フィルタオプションの取得中にエラーが発生しました"
+            detail="業界カテゴリの取得中にエラーが発生しました"
+        )
+
+@router.get("/master/alcohol-types")
+async def get_alcohol_types():
+    """
+    アルコール種別マスタを取得する
+    
+    Returns:
+        List[Dict]: アルコール種別一覧
+    """
+    try:
+        alcohol_types = await mysql_service.get_alcohol_types()
+        return {
+            "alcohol_types": alcohol_types
+        }
+        
+    except Exception as e:
+        logger.error(f"アルコール種別取得エラー: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="アルコール種別の取得中にエラーが発生しました"
         )
