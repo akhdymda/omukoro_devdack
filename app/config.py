@@ -33,13 +33,6 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
     
-    # 追加設定項目（.envファイルに存在する場合）
-    chroma_db_path: Optional[str] = None
-    chroma_dir: Optional[str] = None
-    chroma_collection: Optional[str] = None
-    out_jsonl: Optional[str] = None
-    mongo_coll: Optional[str] = None
-    created_at: Optional[str] = None
     
     class Config:
         env_file = ".env"

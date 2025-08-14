@@ -3,6 +3,9 @@ from typing import Optional, Any
 from app.config import settings
 from redis.asyncio import Redis as AsyncRedis
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 class CacheService:
     """
     Redis を使用したキャッシュサービス
@@ -38,7 +41,7 @@ class CacheService:
                 # 接続テスト
                 await self._redis.ping()
             except Exception as e:
-                print(f"Redis connection failed: {e}")
+                logger.error(f"Redis connection failed: {e}")
                 # Redis接続に失敗した場合はメモリキャッシュにフォールバック
                 self._redis = MemoryCache()
         
@@ -65,7 +68,7 @@ class CacheService:
             return pickle.loads(data)
             
         except Exception as e:
-            print(f"Cache get error: {e}")
+            logger.error(f"Cache get error: {e}")
             return None
     
     async def set(self, key: str, value: Any, expire_seconds: int = 3600) -> bool:
@@ -90,7 +93,7 @@ class CacheService:
             return True
             
         except Exception as e:
-            print(f"Cache set error: {e}")
+            logger.error(f"Cache set error: {e}")
             return False
     
     async def delete(self, key: str) -> bool:
@@ -109,8 +112,30 @@ class CacheService:
             return result > 0
             
         except Exception as e:
-            print(f"Cache delete error: {e}")
+            logger.error(f"Cache delete error: {e}")
             return False
+    
+    def get_health_status(self) -> dict:
+        """
+        キャッシュサービスの健康状態を取得
+        
+        Returns:
+            dict: ヘルスステータス
+        """
+        try:
+            # Redis接続状態を確認
+            redis_available = self._redis is not None
+            return {
+                "cache_available": redis_available,
+                "cache_type": "redis" if redis_available and not isinstance(self._redis, MemoryCache) else "memory"
+            }
+        except Exception as e:
+            logger.error(f"Cache health check error: {e}")
+            return {
+                "cache_available": False,
+                "cache_type": "unavailable",
+                "error": str(e)
+            }
 
 class MemoryCache:
     """

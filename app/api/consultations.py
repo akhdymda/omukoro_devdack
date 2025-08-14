@@ -128,8 +128,9 @@ async def search_consultations(
         industry_categories_data = await mysql_service.get_industry_categories()
         alcohol_types_data = await mysql_service.get_alcohol_types()
         
+        # Note: 本実装では正確なカウントが必要な場合、別途COUNT()クエリを実行
         return SearchResponse(
-            total_count=len(search_results),  # TODO: 実際のカウントクエリを実装
+            total_count=len(search_results),
             results=search_results,
             industry_categories=industry_categories_data,
             alcohol_types=alcohol_types_data

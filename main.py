@@ -21,12 +21,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS設定
+# CORS設定（本番環境では適切なオリジンを指定することを推奨）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # 本番環境では具体的なドメインを指定
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
