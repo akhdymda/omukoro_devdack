@@ -13,6 +13,9 @@ consultation_service = ConsultationService()
 
 @router.get("/consultations")
 async def get_consultations(
+    keyword: Optional[str] = Query(None, description="キーワード"),
+    industry_id: Optional[str] = Query(None, description="業界ID"),
+    alcohol_type_id: Optional[str] = Query(None, description="酒類ID"),
     tenant_id: Optional[str] = Query(None, description="テナントID"),
     user_id: Optional[str] = Query(None, description="ユーザーID"),
     limit: int = Query(20, ge=1, le=100, description="取得件数"),
@@ -22,6 +25,9 @@ async def get_consultations(
     相談一覧を取得する
     
     Args:
+        keyword: キーワード（指定時はタイトル・内容で検索）
+        industry_id: 業界ID（指定時はその業界の相談のみ）
+        alcohol_type_id: 酒類ID（指定時はその酒類の相談のみ）
         tenant_id: テナントID（指定時はそのテナントの相談のみ）
         user_id: ユーザーID（指定時はそのユーザーの相談のみ）
         limit: 取得件数（デフォルト: 20）
@@ -31,13 +37,16 @@ async def get_consultations(
         dict: 相談一覧と総件数
     """
     try:
-        # 検索条件なしで全件取得
+        # フィルタリング条件を設定
+        industry_categories = [industry_id] if industry_id else None
+        alcohol_types = [alcohol_type_id] if alcohol_type_id else None
+        
         consultations = await mysql_service.search_consultations(
-            query=None,
+            query=keyword,
             tenant_id=tenant_id,
             user_id=user_id,
-            industry_categories=None,
-            alcohol_types=None,
+            industry_categories=industry_categories,
+            alcohol_types=alcohol_types,
             limit=limit,
             offset=offset
         )

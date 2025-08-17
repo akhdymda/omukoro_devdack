@@ -101,19 +101,20 @@ class MySQLService:
         # 業界カテゴリフィルタ
         if industry_categories:
             placeholders = ','.join(['%s'] * len(industry_categories))
-            sql += f" AND ic.category_code IN ({placeholders})"
+            sql += f" AND c.industry_category_id IN ({placeholders})"
             params.extend(industry_categories)
         
         # アルコール種別フィルタ
         if alcohol_types:
             placeholders = ','.join(['%s'] * len(alcohol_types))
-            sql += f" AND at.type_code IN ({placeholders})"
+            sql += f" AND c.alcohol_type_id IN ({placeholders})"
             params.extend(alcohol_types)
         
-        # テキスト検索（FULLTEXT検索）
+        # テキスト検索（LIKE検索に変更）
         if query:
-            sql += " AND MATCH(c.title, c.initial_content) AGAINST(%s IN NATURAL LANGUAGE MODE)"
-            params.append(query)
+            sql += " AND (c.title LIKE %s OR c.initial_content LIKE %s)"
+            search_pattern = f"%{query}%"
+            params.extend([search_pattern, search_pattern])
         
         # 並び順
         sql += " ORDER BY c.updated_at DESC"
