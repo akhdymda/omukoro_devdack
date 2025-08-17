@@ -1,34 +1,53 @@
 import pymysql
-import logging
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, AsyncContextManager
+from contextlib import asynccontextmanager
 from app.config import settings
+from app.core.exceptions import DatabaseConnectionError, NotFoundError, ValidationError
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class MySQLService:
     """MySQL データベース接続とクエリサービス"""
     
     def __init__(self):
-        self.connection_config = {
-            'host': settings.mysql_host,
-            'port': settings.mysql_port,
-            'user': settings.mysql_user,
-            'password': settings.mysql_password,
-            'database': settings.mysql_database,
-            'charset': 'utf8mb4',
-            'autocommit': True,
-            'ssl': {'ssl_disabled': False},
-            'ssl_verify_cert': False,
-            'ssl_verify_identity': False
-        }
+        self._connection_config = None
+        self._initialize_config()
     
-    def get_connection(self):
-        """MySQL接続を取得"""
+    def _initialize_config(self):
+        """接続設定を初期化"""
+        if not settings.is_mysql_configured():
+            logger.warning("MySQL設定が不完全です。一部の機能が利用できません。")
+            return
+        
+        self._connection_config = settings.get_mysql_config()
+        logger.info("MySQL接続設定を初期化しました")
+    
+    def is_available(self) -> bool:
+        """MySQLサービスが利用可能かチェック"""
+        return self._connection_config is not None
+    
+    @asynccontextmanager
+    async def get_connection(self) -> AsyncContextManager[pymysql.Connection]:
+        """MySQL接続を取得（コンテキストマネージャー）"""
+        if not self.is_available():
+            raise DatabaseConnectionError("MySQL設定が不完全です")
+        
+        connection = None
         try:
-            return pymysql.connect(**self.connection_config)
+            connection = pymysql.connect(**self._connection_config)
+            logger.debug("MySQL接続を確立しました")
+            yield connection
+        except pymysql.Error as e:
+            logger.error(f"MySQL接続エラー: {e}")
+            raise DatabaseConnectionError(f"データベース接続に失敗しました: {str(e)}")
         except Exception as e:
-            logger.error(f"MySQL connection error: {e}")
-            raise
+            logger.error(f"予期しないデータベースエラー: {e}")
+            raise DatabaseConnectionError(f"データベースエラー: {str(e)}")
+        finally:
+            if connection:
+                connection.close()
+                logger.debug("MySQL接続を閉じました")
     
     async def search_consultations(
         self,
@@ -104,7 +123,7 @@ class MySQLService:
         params.extend([limit, offset])
         
         try:
-            with self.get_connection() as conn:
+            async with self.get_connection() as conn:
                 with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                     cursor.execute(sql, params)
                     results = cursor.fetchall()
@@ -115,11 +134,14 @@ class MySQLService:
                             if result[json_field]:
                                 result[json_field] = result[json_field] if isinstance(result[json_field], (list, dict)) else []
                     
+                    logger.debug(f"相談検索結果: {len(results)}件")
                     return results
                     
-        except Exception as e:
-            logger.error(f"Consultation search error: {e}")
+        except DatabaseConnectionError:
             raise
+        except Exception as e:
+            logger.error(f"相談検索エラー: {e}")
+            raise DatabaseConnectionError(f"相談検索中にエラーが発生しました: {str(e)}")
     
     async def get_industry_categories(self, active_only: bool = True) -> List[Dict[str, Any]]:
         """業界カテゴリ一覧取得"""
@@ -137,13 +159,17 @@ class MySQLService:
         sql += " ORDER BY sort_order, category_name"
         
         try:
-            with self.get_connection() as conn:
+            async with self.get_connection() as conn:
                 with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                     cursor.execute(sql, params)
-                    return cursor.fetchall()
-        except Exception as e:
-            logger.error(f"Industry categories fetch error: {e}")
+                    results = cursor.fetchall()
+                    logger.debug(f"業界カテゴリ取得: {len(results)}件")
+                    return results
+        except DatabaseConnectionError:
             raise
+        except Exception as e:
+            logger.error(f"業界カテゴリ取得エラー: {e}")
+            raise DatabaseConnectionError(f"業界カテゴリの取得中にエラーが発生しました: {str(e)}")
     
     async def get_alcohol_types(self, active_only: bool = True) -> List[Dict[str, Any]]:
         """アルコール種別一覧取得"""
@@ -161,12 +187,16 @@ class MySQLService:
         sql += " ORDER BY sort_order, type_name"
         
         try:
-            with self.get_connection() as conn:
+            async with self.get_connection() as conn:
                 with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                     cursor.execute(sql, params)
-                    return cursor.fetchall()
-        except Exception as e:
-            logger.error(f"Alcohol types fetch error: {e}")
+                    results = cursor.fetchall()
+                    logger.debug(f"アルコール種別取得: {len(results)}件")
+                    return results
+        except DatabaseConnectionError:
             raise
+        except Exception as e:
+            logger.error(f"アルコール種別取得エラー: {e}")
+            raise DatabaseConnectionError(f"アルコール種別の取得中にエラーが発生しました: {str(e)}")
 
 mysql_service = MySQLService()

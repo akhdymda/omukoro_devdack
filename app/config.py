@@ -1,25 +1,27 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
-import os
+from functools import lru_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
-    # OpenAI設定
-    openai_api_key: Optional[str] = None
+    """アプリケーション設定管理クラス"""
     
-    # Cosmos DB設定
-    mongodb_connection_string: Optional[str] = None
-    mongo_db: str = "vector_legal_rag"
-    mongo_collection: str = "alctax_act_chunks"
-
-    # アプリケーション設定
-    secret_key: str = os.getenv("SECRET_KEY", "your-secret-key")
-    algorithm: str = os.getenv("ALGORITHM", "HS256")
-    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+    # アプリケーション基本設定
+    app_name: str = "Omukoro Risk Analysis API"
+    app_version: str = "1.0.0"
+    debug: bool = False
+    environment: str = "development"
     
-    # Redis設定
-    redis_host: str = os.getenv("REDIS_HOST", "localhost")
-    redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
-    redis_db: int = int(os.getenv("REDIS_DB", "0"))
+    # サーバー設定
+    host: str = "0.0.0.0"
+    port: int = 8000
+    
+    # セキュリティ設定
+    secret_key: str = "your-secret-key-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
     
     # MySQL設定
     mysql_host: Optional[str] = None
@@ -27,15 +29,91 @@ class Settings(BaseSettings):
     mysql_user: Optional[str] = None
     mysql_password: Optional[str] = None
     mysql_database: Optional[str] = None
+    mysql_ssl_disabled: bool = True
+    mysql_charset: str = "utf8mb4"
+    mysql_autocommit: bool = True
     
-    # アプリケーション設定
-    app_name: str = "Sherpath API"
-    app_version: str = "1.0.0"
-    debug: bool = False
+    # Redis設定
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: Optional[str] = None
+    redis_decode_responses: bool = True
     
+    # OpenAI設定
+    openai_api_key: Optional[str] = None
+    openai_timeout: int = 30
+    openai_max_retries: int = 3
+    
+    # Cosmos DB設定（オプショナル）
+    mongodb_connection_string: Optional[str] = None
+    mongo_db: str = "vector_legal_rag"
+    mongo_collection: str = "alctax_act_chunks"
+    mongo_timeout: int = 10
+    
+    # ログ設定
+    log_level: str = "INFO"
+    log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    # CORS設定
+    cors_origins: list[str] = ["*"]
+    cors_allow_credentials: bool = True
+    cors_allow_methods: list[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    cors_allow_headers: list[str] = ["*"]
     
     class Config:
         env_file = ".env"
-        extra = "ignore"  # 追加の環境変数を無視
+        env_file_encoding = "utf-8"
+        case_sensitive = False
+        extra = "ignore"
+    
+    def get_mysql_config(self) -> dict:
+        """MySQL接続設定を取得"""
+        if not all([self.mysql_host, self.mysql_user, self.mysql_password, self.mysql_database]):
+            logger.warning("MySQL接続情報が不完全です")
+            return {}
+            
+        return {
+            'host': self.mysql_host,
+            'port': self.mysql_port,
+            'user': self.mysql_user,
+            'password': self.mysql_password,
+            'database': self.mysql_database,
+            'charset': self.mysql_charset,
+            'autocommit': self.mysql_autocommit,
+            'ssl': {'ssl_disabled': self.mysql_ssl_disabled},
+            'ssl_verify_cert': False,
+            'ssl_verify_identity': False
+        }
+    
+    def get_redis_config(self) -> dict:
+        """Redis接続設定を取得"""
+        config = {
+            'host': self.redis_host,
+            'port': self.redis_port,
+            'db': self.redis_db,
+            'decode_responses': self.redis_decode_responses
+        }
+        if self.redis_password:
+            config['password'] = self.redis_password
+        return config
+    
+    def is_mysql_configured(self) -> bool:
+        """MySQL設定が完全かチェック"""
+        return all([self.mysql_host, self.mysql_user, self.mysql_password, self.mysql_database])
+    
+    def is_redis_configured(self) -> bool:
+        """Redis設定が完全かチェック"""
+        return bool(self.redis_host)
+    
+    def is_openai_configured(self) -> bool:
+        """OpenAI設定が完全かチェック"""
+        return bool(self.openai_api_key and self.openai_api_key != "test_key_for_integration_testing")
 
-settings = Settings()
+@lru_cache()
+def get_settings() -> Settings:
+    """設定インスタンスを取得（キャッシュ付き）"""
+    return Settings()
+
+# グローバル設定インスタンス
+settings = get_settings()

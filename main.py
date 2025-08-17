@@ -1,8 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import os
-import logging
+
+from app.config import settings
+from app.core.logging import setup_logging, get_logger
+from app.core.exceptions import (
+    BaseAPIException,
+    api_exception_handler,
+    http_exception_handler,
+    general_exception_handler
+)
+from fastapi import HTTPException
 
 from app.api.analysis import router as analysis_router
 from app.api.consultations import router as consultations_router
@@ -12,23 +20,35 @@ from app.api.health import router as health_router
 load_dotenv()
 
 # ログ設定
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+setup_logging()
+logger = get_logger(__name__)
 
-app = FastAPI(
-    title="Sherpath API (統合版)",
-    description="企画案の論点整理と相談先提案API + 法令検索機能",
-    version="1.0.0",
-)
+def create_app() -> FastAPI:
+    """FastAPIアプリケーションを作成"""
+    app = FastAPI(
+        title=settings.app_name,
+        description="酒税法リスク分析判定システム API",
+        version=settings.app_version,
+        debug=settings.debug,
+    )
 
-# CORS設定（本番環境では適切なオリジンを指定することを推奨）
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 本番環境では具体的なドメインを指定
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["*"],
-)
+    # CORS設定
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=settings.cors_allow_credentials,
+        allow_methods=settings.cors_allow_methods,
+        allow_headers=settings.cors_allow_headers,
+    )
+
+    # 例外ハンドラーの追加
+    app.add_exception_handler(BaseAPIException, api_exception_handler)
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(Exception, general_exception_handler)
+
+    return app
+
+app = create_app()
 
 # ルーターを追加
 app.include_router(analysis_router, prefix="/api", tags=["analysis"])
@@ -37,28 +57,42 @@ app.include_router(health_router, prefix="/api", tags=["health"])
 
 @app.get("/")
 async def root():
-    return {
-        "message": "Sherpath API (統合版) is running",
-        "version": "1.0.0",
+    """ルート情報を取得"""
+    from app.core.exceptions import create_success_response
+    from app.services.mysql_service import mysql_service
+    
+    data = {
+        "message": f"{settings.app_name} is running",
+        "version": settings.app_version,
+        "environment": settings.environment,
         "features": [
             "企画案分析",
-            "法令検索",
-            "相談提案生成"
-        ]
+            "相談提案生成",
+            "マスタデータ管理"
+        ],
+        "services": {
+            "mysql": mysql_service.is_available(),
+            "redis": settings.is_redis_configured(),
+            "openai": settings.is_openai_configured()
+        }
     }
+    
+    return create_success_response(data).model_dump()
 
 @app.get("/info")
 async def get_info():
-    """アプリケーション情報を取得"""
-    return {
-        "name": "Sherpath API (統合版)",
-        "version": "1.0.0",
-        "description": "omukoro_devdack_clone + sherpath_backend の統合版",
+    """アプリケーション詳細情報を取得"""
+    from app.core.exceptions import create_success_response
+    
+    data = {
+        "name": settings.app_name,
+        "version": settings.app_version,
+        "description": "酒税法リスク分析判定システム API",
+        "environment": settings.environment,
         "endpoints": {
             "analysis": "/api/analyze",
             "consultations": {
                 "list": "/api/consultations",
-                "detail": "/api/consultations/{id}",
                 "search": "/api/consultations/search",
                 "generate": "/api/consultations/generate-suggestions"
             },
@@ -69,8 +103,15 @@ async def get_info():
             "health": "/api/health"
         }
     }
+    
+    return create_success_response(data).model_dump()
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("🚀 Sherpath API (統合版) を起動中...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    logger.info(f"🚀 {settings.app_name} を起動中...")
+    uvicorn.run(
+        app, 
+        host=settings.host, 
+        port=settings.port,
+        log_level=settings.log_level.lower()
+    )
