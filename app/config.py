@@ -92,7 +92,11 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Tokyo"
     
     # CORS設定
-    cors_origins: list[str] = ["*"]
+    cors_origins: list[str] = [
+        "https://aps-omu-01.azurewebsites.net",  # 本番環境のフロントエンド
+        "http://localhost:3000",  # 開発環境用
+        "http://localhost:3001"   # 開発環境用
+    ]
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     cors_allow_headers: list[str] = ["*"]
