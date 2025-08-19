@@ -106,6 +106,21 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"
+        
+        @classmethod
+        def parse_env_var(cls, field_name: str, raw_val: str):
+            if field_name == "cors_origins":
+                # 環境変数が文字列の場合、カンマ区切りで分割
+                if raw_val.startswith('[') and raw_val.endswith(']'):
+                    # JSON配列形式の場合
+                    import json
+                    try:
+                        return json.loads(raw_val)
+                    except json.JSONDecodeError:
+                        pass
+                # カンマ区切りの文字列の場合
+                return [origin.strip() for origin in raw_val.split(',')]
+            return raw_val
     
     def get_mysql_config(self) -> dict:
         """MySQL接続設定を取得"""
@@ -153,7 +168,15 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     """設定インスタンスを取得（キャッシュ付き）"""
-    return Settings()
+    settings = Settings()
+    
+    # CORS設定のデバッグログ
+    logger.info(f"CORS設定 - origins: {settings.cors_origins}")
+    logger.info(f"CORS設定 - allow_credentials: {settings.cors_allow_credentials}")
+    logger.info(f"CORS設定 - allow_methods: {settings.cors_allow_methods}")
+    logger.info(f"CORS設定 - allow_headers: {settings.cors_allow_headers}")
+    
+    return settings
 
 # グローバル設定インスタンス
 settings = get_settings()
