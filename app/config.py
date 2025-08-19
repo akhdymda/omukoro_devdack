@@ -24,14 +24,47 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     
     # MySQL設定
-    mysql_host: Optional[str] = None
-    mysql_port: int = 3306
-    mysql_user: Optional[str] = None
-    mysql_password: Optional[str] = None
-    mysql_database: Optional[str] = None
-    mysql_ssl_disabled: bool = True
-    mysql_charset: str = "utf8mb4"
-    mysql_autocommit: bool = True
+    database_host: Optional[str] = None
+    database_port: int = 3306
+    database_user: Optional[str] = None
+    database_password: Optional[str] = None
+    database_name: Optional[str] = None
+    database_ssl: bool = True
+    database_charset: str = "utf8mb4"
+    database_autocommit: bool = True
+    
+    # 後方互換性のためのプロパティ
+    @property
+    def mysql_host(self) -> Optional[str]:
+        return self.database_host
+    
+    @property
+    def mysql_port(self) -> int:
+        return self.database_port
+    
+    @property
+    def mysql_user(self) -> Optional[str]:
+        return self.database_user
+    
+    @property
+    def mysql_password(self) -> Optional[str]:
+        return self.database_password
+    
+    @property
+    def mysql_database(self) -> Optional[str]:
+        return self.database_name
+    
+    @property
+    def mysql_ssl_disabled(self) -> bool:
+        return not self.database_ssl
+    
+    @property
+    def mysql_charset(self) -> str:
+        return self.database_charset
+    
+    @property
+    def mysql_autocommit(self) -> bool:
+        return self.database_autocommit
     
     # Redis設定
     redis_host: str = "localhost"
@@ -54,6 +87,9 @@ class Settings(BaseSettings):
     # ログ設定
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    # タイムゾーン設定
+    timezone: str = "Asia/Tokyo"
     
     # CORS設定
     cors_origins: list[str] = ["*"]

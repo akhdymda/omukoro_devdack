@@ -92,49 +92,70 @@ async def generate_suggestions(text: str = Form(...)):
             detail="提案生成中にエラーが発生しました"
         )
 
-@router.get("/consultations/{consultation_id}", response_model=ConsultationDetailResponse)
-async def get_consultation_detail(consultation_id: str):
+@router.get("/consultations/industry-categories")
+async def get_industry_categories():
     """
-    相談詳細を取得する
+    業種カテゴリの一覧を取得する
     
-    Args:
-        consultation_id: 相談ID
-        
     Returns:
-        ConsultationDetailResponse: 相談詳細
+        List[Dict]: 業種カテゴリの一覧
     """
     try:
-        result = await consultation_service.get_consultation_detail(consultation_id)
-        return result
+        # MySQL接続を優先（Azure MySQL復旧後）
+        from app.services.mysql_service import mysql_service
+        if mysql_service.is_available():
+            categories = await mysql_service.get_industry_categories()
+            # 配列として返すことを明示
+            return categories if isinstance(categories, list) else []
+        
+        # 一時的な対処：ハードコードされたカテゴリデータを返す（Azure MySQL接続失敗時に使用）
+        logger.info("MySQL接続なしで業種カテゴリを返します（一時的な対処）")
+        return [
+            {"category_id": "cat0001", "category_name": "マーケティング商品企画"},
+            {"category_id": "cat0002", "category_name": "製造"},
+            {"category_id": "cat0003", "category_name": "研究開発"},
+            {"category_id": "cat0004", "category_name": "中身開発"},
+            {"category_id": "cat0005", "category_name": "物流"}
+        ]
         
     except Exception as e:
-        logger.error(f"相談詳細取得エラー: {e}")
+        logger.error(f"業種カテゴリ取得エラー: {e}")
         raise HTTPException(
             status_code=500,
-            detail="相談詳細の取得中にエラーが発生しました"
+            detail="業種カテゴリの取得中にエラーが発生しました"
         )
 
-@router.get("/consultations/{consultation_id}/regulations",
-            response_model=List[RegulationChunkResponse])
-async def get_consultation_regulations(consultation_id: str):
+@router.get("/consultations/alcohol-types")
+async def get_alcohol_types():
     """
-    相談に関連する法令を取得する
+    酒類タイプの一覧を取得する
     
-    Args:
-        consultation_id: 相談ID
-        
     Returns:
-        List[RegulationChunkResponse]: 関連法令のリスト
+        List[Dict]: 酒類タイプの一覧
     """
     try:
-        result = await consultation_service.get_consultation_regulations(consultation_id)
-        return result
+        # MySQL接続を優先（Azure MySQL復旧後）
+        from app.services.mysql_service import mysql_service
+        if mysql_service.is_available():
+            types = await mysql_service.get_alcohol_types()
+            # 配列として返すことを明示
+            return types if isinstance(types, list) else []
+        
+        # 一時的な対処：ハードコードされたタイプデータを返す（Azure MySQL接続失敗時に使用）
+        logger.info("MySQL接続なしで酒類タイプを返します（一時的な対処）")
+        return [
+            {"type_id": "alc0001", "type_name": "ビールテイスト"},
+            {"type_id": "alc0002", "type_name": "RTD/RTS"},
+            {"type_id": "alc0003", "type_name": "ワイン"},
+            {"type_id": "alc0004", "type_name": "和酒"},
+            {"type_id": "alc0005", "type_name": "ノンアルコール"}
+        ]
         
     except Exception as e:
-        logger.error(f"相談法令取得エラー: {e}")
+        logger.error(f"酒類タイプ取得エラー: {e}")
         raise HTTPException(
             status_code=500,
-            detail="関連法令の取得中にエラーが発生しました"
+            detail="酒類タイプの取得中にエラーが発生しました"
         )
 
 @router.get("/consultations/search", response_model=SearchResponse)
@@ -197,44 +218,47 @@ async def search_consultations(
             detail="検索中にエラーが発生しました"
         )
 
-@router.get("/master/industries")
-async def get_industry_categories():
+@router.get("/consultations/{consultation_id}", response_model=ConsultationDetailResponse)
+async def get_consultation_detail(consultation_id: str):
     """
-    業界カテゴリマスタを取得する
+    相談詳細を取得する
     
+    Args:
+        consultation_id: 相談ID
+        
     Returns:
-        List[Dict]: 業界カテゴリ一覧
+        ConsultationDetailResponse: 相談詳細
     """
     try:
-        industry_categories = await mysql_service.get_industry_categories()
-        return {
-            "industries": industry_categories
-        }
+        result = await consultation_service.get_consultation_detail(consultation_id)
+        return result
         
     except Exception as e:
-        logger.error(f"業界カテゴリ取得エラー: {e}")
+        logger.error(f"相談詳細取得エラー: {e}")
         raise HTTPException(
             status_code=500,
-            detail="業界カテゴリの取得中にエラーが発生しました"
+            detail="相談詳細の取得中にエラーが発生しました"
         )
 
-@router.get("/master/alcohol-types")
-async def get_alcohol_types():
+@router.get("/consultations/{consultation_id}/regulations",
+            response_model=List[RegulationChunkResponse])
+async def get_consultation_regulations(consultation_id: str):
     """
-    アルコール種別マスタを取得する
+    相談に関連する法令を取得する
     
+    Args:
+        consultation_id: 相談ID
+        
     Returns:
-        List[Dict]: アルコール種別一覧
+        List[RegulationChunkResponse]: 関連法令のリスト
     """
     try:
-        alcohol_types = await mysql_service.get_alcohol_types()
-        return {
-            "alcohol_types": alcohol_types
-        }
+        result = await consultation_service.get_consultation_regulations(consultation_id)
+        return result
         
     except Exception as e:
-        logger.error(f"アルコール種別取得エラー: {e}")
+        logger.error(f"相談法令取得エラー: {e}")
         raise HTTPException(
             status_code=500,
-            detail="アルコール種別の取得中にエラーが発生しました"
+            detail="関連法令の取得中にエラーが発生しました"
         )

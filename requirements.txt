@@ -12,11 +12,11 @@ aiofiles==23.2.1
 python-docx==1.1.0
 openpyxl==3.1.2
 # Cosmos DB接続用
-pymongo
+pymongo>=4.0.0
 # MySQL接続用
 PyMySQL==1.1.0
-# ベクトル検索用
-rank-bm25
-nltk
-numpy<2.0.0
-scikit-learn
+# ベクトル検索用（本番環境では必要に応じて）
+# rank-bm25
+# nltk
+# numpy<2.0.0
+# scikit-learn

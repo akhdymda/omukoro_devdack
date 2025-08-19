@@ -46,3 +46,12 @@ Thumbs.db
 # テスト
 .coverage
 .pytest_cache/
+
+# テスト・チェック用ファイル
+test_*.py
+check_*.py
+*_test.py
+*_test_*.py
+
+# SQLファイル（開発用）
+*.sql

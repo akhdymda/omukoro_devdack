@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import os
 
 from app.config import settings
 from app.core.logging import setup_logging, get_logger
@@ -18,6 +19,15 @@ from app.api.health import router as health_router
 
 # 環境変数を読み込み
 load_dotenv()
+
+# タイムゾーン設定
+os.environ['TZ'] = settings.timezone
+try:
+    import time
+    time.tzset()
+except AttributeError:
+    # Windowsではtzset()が利用できないため、パス
+    pass
 
 # ログ設定
 setup_logging()

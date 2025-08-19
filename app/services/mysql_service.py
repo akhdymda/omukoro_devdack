@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.core.exceptions import DatabaseConnectionError, NotFoundError, ValidationError
 from app.core.logging import get_logger
+import json
 
 logger = get_logger(__name__)
 
@@ -36,7 +37,13 @@ class MySQLService:
         connection = None
         try:
             connection = pymysql.connect(**self._connection_config)
-            logger.debug("MySQL接続を確立しました")
+            
+            # タイムゾーンを日本時間に設定
+            with connection.cursor() as cursor:
+                cursor.execute("SET time_zone = '+09:00'")
+                cursor.execute("SET @@session.time_zone = '+09:00'")
+            
+            logger.debug("MySQL接続を確立しました（タイムゾーン: +09:00）")
             yield connection
         except pymysql.Error as e:
             logger.error(f"MySQL接続エラー: {e}")
@@ -143,6 +150,118 @@ class MySQLService:
         except Exception as e:
             logger.error(f"相談検索エラー: {e}")
             raise DatabaseConnectionError(f"相談検索中にエラーが発生しました: {str(e)}")
+    
+    async def create_consultation(self, consultation_data: Dict[str, Any]) -> str:
+        """相談データを作成・保存"""
+        sql = """
+        INSERT INTO consultation (
+            consultation_id, title, summary_title, initial_content,
+            industry_category_id, alcohol_type_id, key_issues,
+            suggested_questions, action_items, relevant_regulations
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+        )
+        """
+        
+        params = [
+            consultation_data.get('consultation_id'),
+            consultation_data.get('title'),
+            consultation_data.get('summary_title'),
+            consultation_data.get('initial_content'),
+            consultation_data.get('industry_category_id'),
+            consultation_data.get('alcohol_type_id'),
+            json.dumps(consultation_data.get('key_issues')) if consultation_data.get('key_issues') else None,
+            json.dumps(consultation_data.get('suggested_questions')) if consultation_data.get('suggested_questions') else None,
+            json.dumps(consultation_data.get('action_items')) if consultation_data.get('action_items') else None,
+            json.dumps(consultation_data.get('relevant_regulations')) if consultation_data.get('relevant_regulations') else None
+        ]
+        
+        try:
+            async with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(sql, params)
+                    conn.commit()
+                    consultation_id = consultation_data.get('consultation_id')
+                    logger.info(f"相談データを保存しました: {consultation_id}")
+                    return consultation_id
+        except Exception as e:
+            logger.error(f"相談データ保存エラー: {e}")
+            raise DatabaseConnectionError(f"相談データの保存に失敗しました: {str(e)}")
+    
+    async def get_consultation_by_id(self, consultation_id: str) -> Optional[Dict[str, Any]]:
+        """相談IDで相談データを取得"""
+        sql = """
+        SELECT 
+            consultation_id, title, summary_title, initial_content,
+            industry_category_id, alcohol_type_id, key_issues,
+            suggested_questions, action_items, relevant_regulations,
+            updated_at
+        FROM consultation 
+        WHERE consultation_id = %s
+        """
+        
+        try:
+            async with self.get_connection() as conn:
+                with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                    cursor.execute(sql, [consultation_id])
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        # JSONフィールドをパース
+                        for json_field in ['key_issues', 'suggested_questions', 'action_items', 'relevant_regulations']:
+                            if result[json_field]:
+                                try:
+                                    result[json_field] = json.loads(result[json_field])
+                                except json.JSONDecodeError:
+                                    result[json_field] = None
+                    
+                    return result
+        except Exception as e:
+            logger.error(f"相談データ取得エラー: {e}")
+            raise DatabaseConnectionError(f"相談データの取得に失敗しました: {str(e)}")
+    
+    async def update_consultation(self, consultation_id: str, update_data: Dict[str, Any]) -> bool:
+        """相談データを更新"""
+        # 更新可能なフィールドを定義（存在するカラムのみ）
+        updateable_fields = [
+            'title', 'summary_title', 'key_issues', 'suggested_questions',
+            'action_items', 'relevant_regulations'
+        ]
+        
+        set_clauses = []
+        params = []
+        
+        for field in updateable_fields:
+            if field in update_data and update_data[field] is not None:
+                if field in ['key_issues', 'suggested_questions', 'action_items', 'relevant_regulations']:
+                    set_clauses.append(f"{field} = %s")
+                    params.append(json.dumps(update_data[field]))
+                else:
+                    set_clauses.append(f"{field} = %s")
+                    params.append(update_data[field])
+        
+        if not set_clauses:
+            return False
+        
+        set_clauses.append("updated_at = NOW()")
+        params.append(consultation_id)
+        
+        sql = f"""
+        UPDATE consultation 
+        SET {', '.join(set_clauses)}
+        WHERE consultation_id = %s
+        """
+        
+        try:
+            async with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(sql, params)
+                    conn.commit()
+                    logger.info(f"相談データを更新しました: {consultation_id}")
+                    return True
+        except Exception as e:
+            logger.error(f"相談データ更新エラー: {e}")
+            raise DatabaseConnectionError(f"相談データの更新に失敗しました: {str(e)}")
     
     async def get_industry_categories(self, active_only: bool = True) -> List[Dict[str, Any]]:
         """業界カテゴリ一覧取得"""
