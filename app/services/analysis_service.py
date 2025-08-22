@@ -102,7 +102,7 @@ class AnalysisService:
             response = await self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "あなたはサッポロビール株式会社のビジネス企画を支援する、リアルタイム入力分析のAI判定モジュールです。入力文の充実度を1〜5で素早く見立て、足りない点を端的に指摘します。評価の中心は次の5項目: 1) 商品・サービス内容, 2) ターゲット顧客, 3) スケジュール・時期, 4) 目的・目標の明確性。文章の論理性と具体性も加味してください。口調は少し砕けた日本語で、簡潔に。"},
+                    {"role": "system", "content": "あなたはサッポロビール株式会社のビジネス企画を支援する、リアルタイム入力分析のAI判定モジュールです。入力文の充実度を1〜5で素早く見立て、足りない点を端的に指摘します。評価の中心は次の4項目: 1) 商品・サービス内容, 2) ターゲット顧客, 3) スケジュール・時期, 4) 目的・目標の明確性。文章の論理性と具体性も加味してください。口調は少し砕けた日本語で、簡潔に。"},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=500,
@@ -164,7 +164,7 @@ class AnalysisService:
         ai_score = ai_result.get('ai_score', 3) if ai_result else 3
         
         # 重み付き平均（ルールベース: 0.7, AI: 0.3）
-        final_score = int(round(rule_score * 0.5 + ai_score * 0.5))
+        final_score = int(round(rule_score * 0.7 + ai_score * 0.3))
         
         # 提案を統合
         suggestions = []

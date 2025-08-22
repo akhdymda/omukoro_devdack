@@ -9,19 +9,15 @@ class RuleBasedAnalyzer:
         self.rules = {
             'market_analysis': {
                 'keywords': ['市場', 'ターゲット', '顧客', 'ニーズ', 'トレンド', '成長率'],
-                'weight': 0.2
-            },
-            'competitor_analysis': {
-                'keywords': ['競合', '競合他社', '差別化', '強み', '弱み', 'シェア'],
-                'weight': 0.2
+                'weight': 0.4
             },
             'risk_analysis': {
                 'keywords': ['リスク', '課題', '問題', '懸念', '対策', '予防'],
-                'weight': 0.2
+                'weight': 0.3
             },
             'implementation': {
                 'keywords': ['実行', '計画', 'スケジュール', 'マイルストーン', 'アクション', '実施'],
-                'weight': 0.2
+                'weight': 0.3
             }
         }
     
@@ -91,12 +87,6 @@ class RuleBasedAnalyzer:
         # スコアが低いカテゴリについて提案を生成
         if category_scores.get('market_analysis', 0) < 0.5:
             suggestions.append('市場分析の詳細化が必要です')
-        
-        if category_scores.get('competitor_analysis', 0) < 0.5:
-            suggestions.append('競合分析の強化が必要です')
-        
-        if category_scores.get('business_model', 0) < 0.5:
-            suggestions.append('収益モデルの明確化が必要です')
         
         if category_scores.get('risk_analysis', 0) < 0.5:
             suggestions.append('リスク分析の追加が必要です')
