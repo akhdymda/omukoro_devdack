@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Form, Query
 from app.models.consultations import ConsultationDetailResponse, RegulationChunkResponse
 from app.models.search_models import SearchResponse, SearchFiltersResponse
 from app.services.consultation_service import ConsultationService
+from app.services.suggestion_service import SuggestionService
 from app.services.mysql_service import mysql_service
 import logging
 from typing import List, Optional
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 consultation_service = ConsultationService()
+suggestion_service = SuggestionService()
 
 @router.get("/consultations")
 async def get_consultations(
@@ -66,12 +68,16 @@ async def get_consultations(
         )
 
 @router.post("/consultations/generate-suggestions")
-async def generate_suggestions(text: str = Form(...)):
+async def generate_suggestions(
+    text: str = Form(...),
+    user_id: Optional[str] = Form("1", description="ユーザーID（デフォルト: 1）")
+):
     """
     相談内容から提案を生成する
     
     Args:
         text: 相談内容のテキスト
+        user_id: ユーザーID（デフォルト: 1）
         
     Returns:
         dict: 相談IDと分析結果
@@ -80,7 +86,7 @@ async def generate_suggestions(text: str = Form(...)):
         if not text or len(text.strip()) == 0:
             raise HTTPException(status_code=400, detail="相談内容が入力されていません")
         
-        result = await consultation_service.generate_suggestions(text)
+        result = await suggestion_service.generate_suggestions(text, user_id)
         return result
         
     except HTTPException:

@@ -71,6 +71,8 @@ class MySQLService:
         sql = """
         SELECT 
             c.consultation_id,
+            c.tenant_id,
+            c.user_id,
             c.title,
             c.summary_title,
             c.initial_content,
@@ -155,16 +157,18 @@ class MySQLService:
         """相談データを作成・保存"""
         sql = """
         INSERT INTO consultation (
-            consultation_id, title, summary_title, initial_content,
+            consultation_id, tenant_id, user_id, title, summary_title, initial_content,
             industry_category_id, alcohol_type_id, key_issues,
             suggested_questions, action_items, relevant_regulations
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         """
         
         params = [
             consultation_data.get('consultation_id'),
+            '1',  # tenant_id を1に固定
+            consultation_data.get('user_id', '1'),  # user_id を動的に設定（デフォルトは'1'）
             consultation_data.get('title'),
             consultation_data.get('summary_title'),
             consultation_data.get('initial_content'),
@@ -192,7 +196,7 @@ class MySQLService:
         """相談IDで相談データを取得"""
         sql = """
         SELECT 
-            consultation_id, title, summary_title, initial_content,
+            consultation_id, tenant_id, user_id, title, summary_title, initial_content,
             industry_category_id, alcohol_type_id, key_issues,
             suggested_questions, action_items, relevant_regulations,
             updated_at
