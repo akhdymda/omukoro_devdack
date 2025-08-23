@@ -84,6 +84,7 @@ class MySQLService:
             c.detected_terms,
             c.created_at,
             c.updated_at,
+            c.recommended_advisor_id,
             u.name as user_name,
             u.email as user_email,
             ic.category_name as industry_category_name,
@@ -159,9 +160,9 @@ class MySQLService:
         INSERT INTO consultation (
             consultation_id, tenant_id, user_id, title, summary_title, initial_content,
             industry_category_id, alcohol_type_id, key_issues,
-            suggested_questions, action_items, relevant_regulations
+            suggested_questions, action_items, relevant_regulations, recommended_advisor_id
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         """
         
@@ -177,7 +178,8 @@ class MySQLService:
             json.dumps(consultation_data.get('key_issues')) if consultation_data.get('key_issues') else None,
             json.dumps(consultation_data.get('suggested_questions')) if consultation_data.get('suggested_questions') else None,
             json.dumps(consultation_data.get('action_items')) if consultation_data.get('action_items') else None,
-            json.dumps(consultation_data.get('relevant_regulations')) if consultation_data.get('relevant_regulations') else None
+            json.dumps(consultation_data.get('relevant_regulations')) if consultation_data.get('relevant_regulations') else None,
+            consultation_data.get('recommended_advisor_id')  # 新規追加
         ]
         
         try:
@@ -199,7 +201,7 @@ class MySQLService:
             consultation_id, tenant_id, user_id, title, summary_title, initial_content,
             industry_category_id, alcohol_type_id, key_issues,
             suggested_questions, action_items, relevant_regulations,
-            updated_at
+            recommended_advisor_id, updated_at
         FROM consultation 
         WHERE consultation_id = %s
         """
@@ -229,7 +231,7 @@ class MySQLService:
         # 更新可能なフィールドを定義（存在するカラムのみ）
         updateable_fields = [
             'title', 'summary_title', 'key_issues', 'suggested_questions',
-            'action_items', 'relevant_regulations'
+            'action_items', 'relevant_regulations', 'recommended_advisor_id'
         ]
         
         set_clauses = []

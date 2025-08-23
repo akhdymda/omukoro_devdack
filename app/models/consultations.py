@@ -23,3 +23,10 @@ class RegulationChunkResponse(BaseModel):
     text: str
     prefLabel: str
     relevance_score: float
+
+class RecommendedAdvisor(BaseModel):
+    """推奨相談先のアドバイザー情報スキーマ"""
+    user_id: str
+    name: str
+    department: Optional[str] = None
+    email: str

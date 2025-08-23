@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from app.config import settings
 from app.services.cosmos_service import CosmosService
 from app.services.mysql_service import mysql_service
+from app.services.advisor_service import AdvisorService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,9 @@ class SuggestionService:
         else:
             self.openai_client = None
             logger.warning("OpenAI API key is not set")
+        
+        # 新規追加: アドバイザーサービス
+        self.advisor_service = AdvisorService(mysql_service)
     
     async def generate_suggestions(self, text: str, user_id: str = "1") -> Dict[str, Any]:
         """相談内容から提案を生成"""
@@ -61,7 +65,23 @@ class SuggestionService:
                 "relevant_regulations": self._format_regulations_for_frontend(regulations)
             }
             
-            # 7. データベースに保存
+            # 8. 推奨相談先の取得（新規追加）
+            recommended_advisor = None
+            try:
+                recommended_advisor = await self.advisor_service.get_recommended_advisor(
+                    industry_category=result.get('industry_category_id'),
+                    alcohol_type=result.get('alcohol_type_id')
+                )
+            except Exception as e:
+                # アドバイザー取得エラーは推奨生成の失敗とはしない
+                logger.error(f"推奨相談先取得エラー: {str(e)}")
+            
+            # 既存のレスポンスに推奨相談先を追加
+            result['recommended_advisor'] = recommended_advisor
+            # データベース保存用にIDも追加
+            result['recommended_advisor_id'] = recommended_advisor.user_id if recommended_advisor else None
+            
+            # 7. データベースに保存（推奨相談先取得後に実行）
             try:
                 await mysql_service.create_consultation(result)
                 logger.info(f"相談データをデータベースに保存しました: {consultation_id}")
