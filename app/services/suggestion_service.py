@@ -45,7 +45,7 @@ class SuggestionService:
             action_items = await self._generate_action_items(key_issues)
             
             # 7. 結果を統合
-            consultation_id = self._generate_consultation_id(text)
+            consultation_id = await self._generate_consultation_id()
             
             result = {
                 "consultation_id": consultation_id,
@@ -77,11 +77,25 @@ class SuggestionService:
             logger.error(f"相談分析エラー: {e}")
             raise
     
-    def _generate_consultation_id(self, text: str) -> str:
-        """相談IDを生成"""
-        # テキストのハッシュからIDを生成
-        hash_object = hashlib.md5(text.encode())
-        return f"consultation_{hash_object.hexdigest()[:8]}"
+    async def _generate_consultation_id(self) -> str:
+        """相談IDを連番で生成"""
+        try:
+            # データベースから最新のconsultation_idを取得
+            latest_id = await mysql_service.get_latest_consultation_id()
+            
+            if latest_id is None:
+                # レコードが存在しない場合は1から開始
+                return "1"
+            
+            # 最新のIDから次の番号を計算
+            next_id = int(latest_id) + 1
+            return str(next_id)
+            
+        except Exception as e:
+            logger.error(f"consultation_id生成エラー: {e}")
+            # エラー時はタイムスタンプベースのIDを生成
+            import time
+            return str(int(time.time()))
     
     def _format_regulations_for_frontend(self, regulations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """フロントエンド用に法令データをフォーマット"""

@@ -323,4 +323,25 @@ class MySQLService:
             logger.error(f"アルコール種別取得エラー: {e}")
             raise DatabaseConnectionError(f"アルコール種別の取得中にエラーが発生しました: {str(e)}")
 
+    async def get_latest_consultation_id(self) -> Optional[str]:
+        """最新のconsultation_idを取得"""
+        sql = """
+        SELECT consultation_id 
+        FROM consultation 
+        ORDER BY created_at DESC 
+        LIMIT 1
+        """
+        
+        try:
+            async with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(sql)
+                    result = cursor.fetchone()
+                    if result:
+                        return result[0]
+                    return None
+        except Exception as e:
+            logger.error(f"最新consultation_id取得エラー: {e}")
+            raise DatabaseConnectionError(f"最新consultation_idの取得に失敗しました: {str(e)}")
+
 mysql_service = MySQLService()
