@@ -87,6 +87,14 @@ async def generate_suggestions(
             raise HTTPException(status_code=400, detail="相談内容が入力されていません")
         
         result = await suggestion_service.generate_suggestions(text, user_id)
+        
+        # 推奨相談先が見つからない場合は404エラー
+        if result.get('recommended_advisor') is None:
+            raise HTTPException(
+                status_code=404,
+                detail="適切なアドバイザーが見つかりませんでした"
+            )
+        
         return result
         
     except HTTPException:
