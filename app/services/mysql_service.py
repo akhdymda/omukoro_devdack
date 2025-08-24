@@ -154,6 +154,88 @@ class MySQLService:
             logger.error(f"相談検索エラー: {e}")
             raise DatabaseConnectionError(f"相談検索中にエラーが発生しました: {str(e)}")
     
+    async def search_consultations_for_similar_cases(
+        self,
+        industry_categories: Optional[List[str]] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """類似相談案件取得専用の相談検索（JSONフィールドを適切にパース）"""
+        
+        sql = """
+        SELECT 
+            c.consultation_id,
+            c.tenant_id,
+            c.user_id,
+            c.title,
+            c.summary_title,
+            c.initial_content,
+            c.information_sufficiency_level,
+            c.key_issues,
+            c.suggested_questions,
+            c.relevant_regulations,
+            c.action_items,
+            c.detected_terms,
+            c.created_at,
+            c.updated_at,
+            c.recommended_advisor_id,
+            c.industry_category_id,
+            c.alcohol_type_id,
+            u.name as user_name,
+            u.email as user_email,
+            ic.category_name as industry_category_name,
+            at.type_name as alcohol_type_name
+        FROM consultation c
+        LEFT JOIN user u ON c.user_id = u.user_id
+        LEFT JOIN industry_category ic ON c.industry_category_id = ic.category_id
+        LEFT JOIN alcohol_type at ON c.alcohol_type_id = at.type_id
+        WHERE 1=1
+        """
+        
+        params = []
+        
+        # 業界カテゴリフィルタ
+        if industry_categories:
+            placeholders = ','.join(['%s'] * len(industry_categories))
+            sql += f" AND c.industry_category_id IN ({placeholders})"
+            params.extend(industry_categories)
+        
+        # 並び順
+        sql += " ORDER BY c.updated_at DESC"
+        
+        # ページング
+        sql += " LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+        
+        try:
+            async with self.get_connection() as conn:
+                with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                    cursor.execute(sql, params)
+                    results = cursor.fetchall()
+                    
+                    # JSON フィールドを適切にパース
+                    for result in results:
+                        for json_field in ['key_issues', 'suggested_questions', 'relevant_regulations', 'action_items', 'detected_terms']:
+                            if result[json_field]:
+                                if isinstance(result[json_field], str):
+                                    try:
+                                        result[json_field] = json.loads(result[json_field])
+                                    except json.JSONDecodeError:
+                                        result[json_field] = []
+                                elif not isinstance(result[json_field], (list, dict)):
+                                    result[json_field] = []
+                            else:
+                                result[json_field] = []
+                    
+                    logger.debug(f"類似相談案件取得専用検索結果: {len(results)}件")
+                    return results
+                    
+        except DatabaseConnectionError:
+            raise
+        except Exception as e:
+            logger.error(f"類似相談案件取得専用検索エラー: {e}")
+            raise DatabaseConnectionError(f"類似相談案件取得専用検索中にエラーが発生しました: {str(e)}")
+    
     async def create_consultation(self, consultation_data: Dict[str, Any]) -> str:
         """相談データを作成・保存"""
         sql = """

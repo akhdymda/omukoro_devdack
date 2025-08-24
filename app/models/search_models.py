@@ -8,7 +8,7 @@ class ConsultationSearchResult(BaseModel):
     title: str
     summary_title: Optional[str] = None
     initial_content: str
-    information_sufficiency_level: Optional[int] = 0
+    information_sufficiency_level: int = 0
     key_issues: Optional[List[str]] = []
     suggested_questions: Optional[List[str]] = []
     relevant_regulations: Optional[List[Dict[str, Any]]] = []
