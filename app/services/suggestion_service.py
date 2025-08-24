@@ -39,14 +39,14 @@ class SuggestionService:
             # 3. 業種・酒類カテゴリの選択
             industry_category_id, alcohol_type_id = await self._select_categories_with_openai(text)
             
-            # 4. 主要論点の生成
-            key_issues = await self._generate_key_issues(text, regulations)
+            # 4. 主要論点の生成（リスト形式で取得）
+            key_issues_list = await self._generate_key_issues(text, regulations)
             
-            # 5. 提案質問の生成
-            suggested_questions = await self._generate_suggested_questions(key_issues)
+            # 5. 提案質問の生成（既存のまま）
+            suggested_questions = await self._generate_suggested_questions('\n'.join(key_issues_list))
             
             # 6. 次のアクションの生成
-            action_items = await self._generate_action_items(key_issues)
+            action_items = await self._generate_action_items('\n'.join(key_issues_list))
             
             # 7. 結果を統合
             consultation_id = await self._generate_consultation_id()
@@ -59,8 +59,26 @@ class SuggestionService:
                 "initial_content": text,
                 "industry_category_id": industry_category_id,
                 "alcohol_type_id": alcohol_type_id,
-                "key_issues": key_issues,
+                
+                # 新規追加：個別論点
+                "key_issue_1": key_issues_list[0] if len(key_issues_list) > 0 else '',
+                "key_issue_2": key_issues_list[1] if len(key_issues_list) > 1 else '',
+                "key_issue_3": key_issues_list[2] if len(key_issues_list) > 2 else '',
+                
+                # 新規追加：個別質問（ナンバリング追加）
+                "suggested_question_1": f"1. {suggested_questions[0]}" if len(suggested_questions) > 0 else '',
+                "suggested_question_2": f"2. {suggested_questions[1]}" if len(suggested_questions) > 1 else '',
+                "suggested_question_3": f"3. {suggested_questions[2]}" if len(suggested_questions) > 2 else '',
+                
+                # 既存項目（プログラムベースで結合）
+                "key_issues": '\n'.join(key_issues_list),
                 "suggested_questions": suggested_questions,
+                
+                # 論点・質問ペア（修正後：番号除去、文頭に「論点：」「質問：」追加）
+                "issue_question_pair_1": f"論点：{key_issues_list[0].replace('1. ', '') if key_issues_list[0].startswith('1. ') else key_issues_list[0]}\n質問：{suggested_questions[0]}" if len(key_issues_list) > 0 and len(suggested_questions) > 0 else '',
+                "issue_question_pair_2": f"論点：{key_issues_list[1].replace('2. ', '') if key_issues_list[1].startswith('2. ') else key_issues_list[1]}\n質問：{suggested_questions[1]}" if len(key_issues_list) > 1 and len(suggested_questions) > 1 else '',
+                "issue_question_pair_3": f"論点：{key_issues_list[2].replace('3. ', '') if key_issues_list[2].startswith('3. ') else key_issues_list[2]}\n質問：{suggested_questions[2]}" if len(key_issues_list) > 2 and len(suggested_questions) > 2 else '',
+                
                 "action_items": action_items,
                 "relevant_regulations": self._format_regulations_for_frontend(regulations)
             }
@@ -304,27 +322,33 @@ class SuggestionService:
         """酒類タイプIDが有効かチェック"""
         return any(type_item['type_id'] == type_id for type_item in types)
     
-    async def _generate_key_issues(self, text: str, regulations: List[Dict[str, Any]]) -> str:
-        """主要論点を生成"""
+    async def _generate_key_issues(self, text: str, regulations: List[Dict[str, Any]]) -> List[str]:
+        """主要論点を生成（3個の論点をリストで返却）"""
         if not self.openai_client:
-            return "酒税法の適用に関する主要な論点を確認する必要があります。"
+            return [
+                "酒税法の適用に関する主要な論点を確認する必要があります。",
+                "酒税法の適用に関する主要な論点を確認する必要があります。",
+                "酒税法の適用に関する主要な論点を確認する必要があります。"
+            ]
         
         try:
+            # 法令テキストを全文で取得（200文字制限を削除）
             regulations_text = "\n".join([
-                f"- {reg['prefLabel']}: {reg['text'][:200]}..."
+                f"- {reg['prefLabel']}: {reg['text']}"
                 for reg in regulations
             ])
             
             prompt = f"""
-以下の相談内容と関連法令の情報を基に、主要な論点を3-5個生成してください。
+以下の相談内容と関連法令の情報を基に、主要な論点を3個生成してください。
 
 相談内容: {text}
 
 関連法令:
 {regulations_text}
 
-主要な論点を3-5個生成してください。
-各論点は100-150文字程度で、具体的で実用的な内容にしてください。
+主要な論点を3個生成してください。
+各論点は250-300文字程度で、ひとつの文章は簡潔にしてください。
+文章間は適切に改行を入れてください。
 """
             
             response = await self.openai_client.chat.completions.create(
@@ -333,28 +357,41 @@ class SuggestionService:
                     {"role": "system", "content": "あなたは法律とビジネスの専門家です。相談内容を分析して、具体的で実用的な主要論点を提供してください。"},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1000,
+                max_tokens=1500,  # 250-300文字 × 3個 + 改行分で増加
                 temperature=0.7
             )
             
-            return response.choices[0].message.content
+            # 生成された論点を3個に分割
+            content = response.choices[0].message.content
+            # 改行で分割し、空行を除去
+            issues = [issue.strip() for issue in content.split('\n') if issue.strip()]
+            
+            # 3個に制限し、不足分はデフォルト値で補完
+            while len(issues) < 3:
+                issues.append("酒税法の適用に関する主要な論点を確認する必要があります。")
+            
+            return issues[:3]  # 最大3個
             
         except Exception as e:
             logger.error(f"主要論点生成エラー: {e}")
-            return "酒税法の適用に関する主要な論点を確認する必要があります。"
+            return [
+                "酒税法の適用に関する主要な論点を確認する必要があります。",
+                "酒税法の適用に関する主要な論点を確認する必要があります。",
+                "酒税法の適用に関する主要な論点を確認する必要があります。"
+            ]
     
     async def _generate_suggested_questions(self, key_issues: str) -> List[str]:
         """提案質問を生成"""
         if not self.openai_client:
             return [
-                "酒税法の基本的な要件は何ですか？",
-                "許可申請の手続きはどのようなものですか？",
-                "更新手続きの期限はいつですか？"
+                "酒税法の適用に関する主要な質問をする必要があります。",
+                "酒税法の適用に関する主要な質問をする必要があります。",
+                "酒税法の適用に関する主要な質問をする必要があります。"
             ]
         
         try:
             prompt = f"""
-以下の主要論点を基に、専門家に質問する際の具体的な質問文を3-5個生成してください。
+以下の主要論点を基に、専門家に質問する際の具体的な質問文を3個生成してください。
 
 主要論点:
 {key_issues}
@@ -364,13 +401,13 @@ class SuggestionService:
 - 専門家が明確に回答できる形式
 - ビジネスに直結する内容
 
-各質問は100-150文字程度で、質問文のみを箇条書きで出力してください。
+各質問は100文字前後で、質問文のみを箇条書きで出力してください。
 """
             
             response = await self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "あなたは法律相談の専門家です。主要論点を基に、専門家への具体的な質問文を生成してください。"},
+                    {"role": "system", "content": "あなたは法令リスク判断の専門家支援AIです。入力として、ある企画に関する法律リスク論点（約300字）が与えられます。あなたの役割は、その内容から「専門家に確認すべき主要な事柄」に絞り込み、100字程度の日本語の質問文を1つ生成することです。制約条件: - 質問文は明確で、専門家が回答しやすい形にする - 不要な背景説明は含めない - 「〜について確認したい」などの問いかけ形式でまとめる"},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=1000,
@@ -383,19 +420,19 @@ class SuggestionService:
             
             if not questions:
                 questions = [
-                    "酒税法の基本的な要件は何ですか？",
-                    "許可申請の手続きはどのようなものですか？",
-                    "更新手続きの期限はいつですか？"
+                    "酒税法の適用に関する主要な質問をする必要があります。",
+                    "酒税法の適用に関する主要な質問をする必要があります。",
+                    "酒税法の適用に関する主要な質問をする必要があります。"
                 ]
             
-            return questions[:5]  # 最大5件
+            return questions[:3]  # 3個に制限
             
         except Exception as e:
             logger.error(f"提案質問生成エラー: {e}")
             return [
-                "酒税法の基本的な要件は何ですか？",
-                "許可申請の手続きはどのようなものですか？",
-                "更新手続きの期限はいつですか？"
+                "酒税法の適用に関する主要な質問をする必要があります。",
+                "酒税法の適用に関する主要な質問をする必要があります。",
+                "酒税法の適用に関する主要な質問をする必要があります。"
             ]
     
     async def _generate_action_items(self, key_issues: str) -> str:
