@@ -7,6 +7,7 @@ from app.services.cosmos_service import CosmosService
 from app.services.mysql_service import mysql_service
 from app.services.advisor_service import AdvisorService
 import logging
+import pymysql
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,9 @@ class SuggestionService:
         
         # 新規追加: アドバイザーサービス
         self.advisor_service = AdvisorService(mysql_service)
+        
+        # 新規追加: データベースプール（専門用語取得用）
+        # self.db_pool = mysql_service.pool  # 一時的にコメントアウト
     
     async def generate_suggestions(self, text: str, user_id: str = "1") -> Dict[str, Any]:
         """相談内容から提案を生成"""
@@ -48,7 +52,13 @@ class SuggestionService:
             # 6. 次のアクションの生成
             action_items = await self._generate_action_items('\n'.join(key_issues_list))
             
-            # 7. 結果を統合
+            # 7. 専門用語の抽出・分析（新規追加）
+            term_analysis = await self._extract_terms_from_key_issues(key_issues_list)
+            
+            # 7.5. 法令マッピング（新規追加）
+            regulation_mapping = await self._map_regulations_to_key_issues(key_issues_list, regulations)
+            
+            # 8. 結果を統合
             consultation_id = await self._generate_consultation_id()
             
             result = {
@@ -79,8 +89,30 @@ class SuggestionService:
                 "issue_question_pair_2": f"論点：{key_issues_list[1].replace('2. ', '') if key_issues_list[1].startswith('2. ') else key_issues_list[1]}\n質問：{suggested_questions[1]}" if len(key_issues_list) > 1 and len(suggested_questions) > 1 else '',
                 "issue_question_pair_3": f"論点：{key_issues_list[2].replace('3. ', '') if key_issues_list[2].startswith('3. ') else key_issues_list[2]}\n質問：{suggested_questions[2]}" if len(key_issues_list) > 2 and len(suggested_questions) > 2 else '',
                 
-                "action_items": action_items,
-                "relevant_regulations": self._format_regulations_for_frontend(regulations)
+                # 新規追加：専門用語分析
+                "term_name_1": term_analysis.get('term_name_1'),
+                "term_name_2": term_analysis.get('term_name_2'),
+                "term_name_3": term_analysis.get('term_name_3'),
+                
+                "term_definition_1": term_analysis.get('term_definition_1'),
+                "term_definition_2": term_analysis.get('term_definition_2'),
+                "term_definition_3": term_analysis.get('term_definition_3'),
+                
+                            "term_context_1": term_analysis.get('term_context_1'),
+            "term_context_2": term_analysis.get('term_context_2'),
+            "term_context_3": term_analysis.get('term_context_3'),
+            
+            # 新規追加：法令マッピング
+            "relevant_regulation_1": regulation_mapping.get('relevant_regulation_1'),
+            "relevant_regulation_2": regulation_mapping.get('relevant_regulation_2'),
+            "relevant_regulation_3": regulation_mapping.get('relevant_regulation_3'),
+            
+            "relevant_reg_text_1": regulation_mapping.get('relevant_reg_text_1'),
+            "relevant_reg_text_2": regulation_mapping.get('relevant_reg_text_2'),
+            "relevant_reg_text_3": regulation_mapping.get('relevant_reg_text_3'),
+            
+            "action_items": action_items,
+            "relevant_regulations": self._format_regulations_for_frontend(regulations)
             }
             
             # 8. 推奨相談先の取得（新規追加）
@@ -481,4 +513,208 @@ class SuggestionService:
         except Exception as e:
             logger.error(f"アクション生成エラー: {e}")
             return "酒税法の詳細調査を開始する\n専門家への相談を予約する\n必要な書類を準備する"
+
+    async def _extract_terms_from_key_issues(self, key_issues_list: List[str]) -> Dict[str, Any]:
+        """主要論点から専門用語を抽出し、定義と文脈での意味合いを生成"""
+        
+        # データベースから専門用語一覧を取得
+        terms = await self._get_term_definitions()
+        
+        result = {}
+        
+        for i, key_issue in enumerate(key_issues_list, 1):
+            if not key_issue:
+                # 空の場合はnullを設定
+                result[f'term_name_{i}'] = None
+                result[f'term_definition_{i}'] = None
+                result[f'term_context_{i}'] = None
+                continue
+                
+            # 専門用語の抽出（部分一致）
+            matched_terms = []
+            for term in terms:
+                if term['term_name'] in key_issue:
+                    matched_terms.append(term)
+            
+            if matched_terms:
+                # 用語名、定義、文脈での意味合いを生成
+                term_names = [term['term_name'] for term in matched_terms]
+                term_definitions = [term['definition'] for term in matched_terms]
+                
+                # 区切り文字で結合（フロントエンドで区別しやすいように）
+                result[f'term_name_{i}'] = ' | '.join(term_names)
+                result[f'term_definition_{i}'] = ' | '.join(term_definitions)
+                
+                # 文脈での意味合いを生成
+                context_meanings = []
+                for term in matched_terms:
+                    context = await self._generate_term_context(term['term_name'], key_issue)
+                    context_meanings.append(context)
+                
+                result[f'term_context_{i}'] = ' | '.join(context_meanings)
+            else:
+                # ヒットしない場合はnullを設定
+                result[f'term_name_{i}'] = None
+                result[f'term_definition_{i}'] = None
+                result[f'term_context_{i}'] = None
+        
+        return result
+
+    async def _get_term_definitions(self) -> List[Dict[str, Any]]:
+        """term_definitionテーブルから専門用語一覧を取得"""
+        try:
+            # mysql_serviceのget_connection()を使用して専門用語を取得
+            async with mysql_service.get_connection() as conn:
+                with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                    query = "SELECT term_name, definition FROM term_definition ORDER BY term_id"
+                    cursor.execute(query)
+                    result = cursor.fetchall()
+                    return result
+                
+        except Exception as e:
+            logger.error(f"専門用語取得エラー: {e}")
+            return []
+
+    async def _generate_term_context(self, term_name: str, key_issue: str) -> str:
+        """専門用語の文脈での意味合いを新入社員にもわかりやすく生成"""
+        if not self.openai_client:
+            return f"{term_name}について、この相談での意味を確認する必要があります。"
+        
+        try:
+            prompt = f"""
+以下の専門用語と相談内容から、新入社員にもわかりやすく、この相談での意味を100字以内で説明してください。
+
+専門用語: {term_name}
+相談内容: {key_issue}
+
+説明のポイント:
+- 新入社員でも理解できる簡単な言葉で
+- この相談でなぜ重要かを具体的に
+- 専門用語の意味を日常的な例えで説明
+- 「つまり〜ということ」「簡単に言うと〜」などの表現を使う
+- 100字以内で簡潔に
+
+例:
+- 「エキス分」→「つまり、お酒の濃さを表す数値で、この相談では計算方法を確認したいということ」
+- 「発泡性酒類」→「簡単に言うと、泡が出るお酒のことで、この相談では製造許可の手続きを知りたいということ」
+"""
+            
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "あなたは新入社員にもわかりやすく法令用語を説明する専門家です。難しい専門用語を日常的な言葉で分かりやすく説明してください。"},
+                    {"role": "user", "content": prompt}
+            ],
+                max_tokens=200,
+                temperature=0.7
+            )
+            
+            content = response.choices[0].message.content.strip()
+            return content if content else f"{term_name}について、この相談での意味を確認する必要があります。"
+            
+        except Exception as e:
+            logger.error(f"文脈意味合い生成エラー: {e}")
+            return f"{term_name}について、この相談での意味を確認する必要があります。"
+
+    async def _find_matching_regulations(self, key_issue: str, regulations: List[Dict[str, Any]], threshold: float = 20.0) -> List[Dict[str, Any]]:
+        """論点に関連する法令を複数選択（閾値以上のスコア）"""
+        if not regulations:
+            return []
+        
+        matching_regulations = []
+        
+        for regulation in regulations:
+            score = await self._calculate_relevance_score(key_issue, regulation)
+            if score >= threshold:
+                matching_regulations.append({
+                    'regulation': regulation,
+                    'score': score
+                })
+        
+        # スコア降順でソート
+        matching_regulations.sort(key=lambda x: x['score'], reverse=True)
+        
+        return matching_regulations
+
+    async def _calculate_relevance_score(self, key_issue: str, regulation: Dict[str, Any]) -> float:
+        """論点と法令の関連性スコアを計算"""
+        score = 0.0
+        
+        # 1. ベクトル検索スコア（既存のスコアを参考として使用）
+        base_score = regulation.get('score', 0.0)
+        score += base_score * 0.3  # 30%の重み
+        
+        # 2. キーワードマッチングスコア
+        keyword_score = await self._calculate_keyword_match_score(key_issue, regulation)
+        score += keyword_score * 0.7  # 70%の重み
+        
+        return score
+
+    async def _calculate_keyword_match_score(self, key_issue: str, regulation: Dict[str, Any]) -> float:
+        """キーワードマッチングによるスコア計算（term_definitionテーブルから動的取得）"""
+        score = 0.0
+        
+        # 法令テキストとラベルからキーワードを抽出
+        regulation_text = regulation.get('text', '')
+        regulation_label = regulation.get('prefLabel', '')
+        
+        try:
+            # term_definitionテーブルから動的にキーワードを取得
+            keywords = await self._get_term_definitions()
+            keyword_names = [term['term_name'] for term in keywords]
+            
+            # 論点と法令のキーワードマッチング
+            for keyword in keyword_names:
+                if keyword in key_issue:
+                    # 論点にキーワードが含まれている場合
+                    if keyword in regulation_text:
+                        score += 10.0  # 法令テキストにも含まれている
+                    if keyword in regulation_label:
+                        score += 15.0  # 法令ラベルに含まれている場合はボーナス
+                        
+        except Exception as e:
+            logger.error(f"キーワードマッチングスコア計算エラー: {e}")
+            # エラー時は0点を返す
+        
+        return score
+
+    def _format_regulation_info(self, regulations: List[Dict[str, Any]]) -> tuple[str, str]:
+        """複数の法令情報を一つのフィールドにフォーマット"""
+        if not regulations:
+            return '', ''
+        
+        # prefLabelとtextを区切り文字で結合
+        pref_labels = [reg['regulation']['prefLabel'] for reg in regulations]
+        regulation_texts = [reg['regulation']['text'] for reg in regulations]
+        
+        # 区切り文字で結合（フロントエンドで区別しやすいように）
+        formatted_labels = ' | '.join(pref_labels)
+        formatted_texts = ' | '.join(regulation_texts)
+        
+        return formatted_labels, formatted_texts
+
+    async def _map_regulations_to_key_issues(self, key_issues_list: List[str], regulations: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """主要論点と関連法令を内容ベースでマッピング（複数選択対応）"""
+        result = {}
+        
+        for i, key_issue in enumerate(key_issues_list, 1):
+            if not key_issue:
+                result[f'relevant_regulation_{i}'] = None
+                result[f'relevant_reg_text_{i}'] = None
+                continue
+            
+            # 閾値以上のスコアを持つ法令を複数選択
+            matching_regulations = await self._find_matching_regulations(key_issue, regulations, threshold=20.0)
+            
+            if matching_regulations:
+                # 複数の法令情報を一つのフィールドにフォーマット
+                formatted_labels, formatted_texts = self._format_regulation_info(matching_regulations)
+                result[f'relevant_regulation_{i}'] = formatted_labels
+                result[f'relevant_reg_text_{i}'] = formatted_texts
+            else:
+                # 閾値未満の場合はnullを設定
+                result[f'relevant_regulation_{i}'] = None
+                result[f'relevant_reg_text_{i}'] = None
+        
+        return result
 
