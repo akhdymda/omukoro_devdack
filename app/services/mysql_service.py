@@ -242,9 +242,16 @@ class MySQLService:
         INSERT INTO consultation (
             consultation_id, tenant_id, user_id, title, summary_title, initial_content,
             industry_category_id, alcohol_type_id, key_issues,
-            suggested_questions, action_items, relevant_regulations, recommended_advisor_id
+            suggested_questions, action_items, relevant_regulations, recommended_advisor_id,
+            issue_question_pair_1, issue_question_pair_2, issue_question_pair_3,
+            term_name_1, term_name_2, term_name_3,
+            term_definition_1, term_definition_2, term_definition_3,
+            term_context_1, term_context_2, term_context_3,
+            relevant_regulation_1, relevant_regulation_2, relevant_regulation_3,
+            relevant_reg_text_1, relevant_reg_text_2, relevant_reg_text_3
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         """
         
@@ -261,7 +268,26 @@ class MySQLService:
             json.dumps(consultation_data.get('suggested_questions')) if consultation_data.get('suggested_questions') else None,
             json.dumps(consultation_data.get('action_items')) if consultation_data.get('action_items') else None,
             json.dumps(consultation_data.get('relevant_regulations')) if consultation_data.get('relevant_regulations') else None,
-            consultation_data.get('recommended_advisor_id')  # 新規追加
+            consultation_data.get('recommended_advisor_id'),  # 新規追加
+            # 新しく追加されたフィールド
+            consultation_data.get('issue_question_pair_1'),
+            consultation_data.get('issue_question_pair_2'),
+            consultation_data.get('issue_question_pair_3'),
+            consultation_data.get('term_name_1'),
+            consultation_data.get('term_name_2'),
+            consultation_data.get('term_name_3'),
+            consultation_data.get('term_definition_1'),
+            consultation_data.get('term_definition_2'),
+            consultation_data.get('term_definition_3'),
+            consultation_data.get('term_context_1'),
+            consultation_data.get('term_context_2'),
+            consultation_data.get('term_context_3'),
+            consultation_data.get('relevant_regulation_1'),
+            consultation_data.get('relevant_regulation_2'),
+            consultation_data.get('relevant_regulation_3'),
+            consultation_data.get('relevant_reg_text_1'),
+            consultation_data.get('relevant_reg_text_2'),
+            consultation_data.get('relevant_reg_text_3')
         ]
         
         try:

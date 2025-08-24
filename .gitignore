@@ -60,3 +60,6 @@ app/api/consultations.py.backup_20250822_090736
 app/api/consultations.py.backup_20250827_143000
 app/services/consultation_service.py.backup_20250827_143000
 app/services/mysql_service.py.backup_before_recommended_advisor_fix
+add_issue_question_pair_columns.py
+add_missing_columns.py
+debug_create_consultation.py
