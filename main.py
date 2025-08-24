@@ -16,6 +16,7 @@ from fastapi import HTTPException
 from app.api.analysis import router as analysis_router
 from app.api.consultations import router as consultations_router
 from app.api.health import router as health_router
+from app.api.similar_cases import router as similar_cases_router
 
 # 環境変数を読み込み
 load_dotenv()
@@ -64,6 +65,7 @@ app = create_app()
 app.include_router(analysis_router, prefix="/api", tags=["analysis"])
 app.include_router(consultations_router, prefix="/api", tags=["consultations"])
 app.include_router(health_router, prefix="/api", tags=["health"])
+app.include_router(similar_cases_router, prefix="/api", tags=["similar_cases"])
 
 @app.get("/")
 async def root():
