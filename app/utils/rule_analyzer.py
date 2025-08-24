@@ -42,6 +42,10 @@ class RuleBasedAnalyzer:
                 'confidence': 1.0
             }
         
+        # 重要キーワードのチェック（中程度判定の保証）
+        important_keywords = ['顧客', 'ターゲット', 'リスク', 'スケジュール', '計画']
+        has_important_keyword = any(keyword in text for keyword in important_keywords)
+
         # 各カテゴリのスコアを計算
         category_scores = {}
         total_score = 0
@@ -51,14 +55,20 @@ class RuleBasedAnalyzer:
             category_scores[category] = score
             total_score += score * rule['weight']
         
+        # 充実度スコアを1-5の範囲に正規化（より寛容な計算）
+        if has_important_keyword:
+        # 重要キーワードがある場合は最低3を保証
+           base_score = max(0.6, total_score)  # 0.6 * 5 = 3
+        else:
+           base_score = max(0.4, total_score)  # 0.4 * 5 = 2
         # 充実度スコアを1-5の範囲に正規化
-        completeness = max(1, min(5, int(round(total_score * 5))))
+        completeness = max(1, min(5, int(round(base_score * 5))))
         
         # 改善提案を生成
         suggestions = self._generate_suggestions(category_scores)
         
         # 信頼度を計算
-        confidence = min(1.0, 0.5 + (total_score * 0.5))
+        confidence = min(1.0, 0.7 + (total_score * 0.3))
         
         return {
             'completeness': completeness,
@@ -71,9 +81,11 @@ class RuleBasedAnalyzer:
         """カテゴリごとのスコアを計算"""
         score = 0.0
         text_lower = text.lower()
+        matched_keywords = 0
         
         for keyword in keywords:
             if keyword.lower() in text_lower:
+                matched_keywords += 1
                 score += 1.0
         
         # キーワードの出現回数も考慮
@@ -81,8 +93,16 @@ class RuleBasedAnalyzer:
             count = len(re.findall(keyword.lower(), text_lower))
             if count > 1:
                 score += min(0.5, count * 0.1)
-        
-        return min(1.0, score / len(keywords))
+
+        # より寛容なスコア計算：1つでもマッチすれば基本点を与える
+        if matched_keywords > 0:
+        # マッチしたキーワード数に基づいてスコア調整
+            base_score = min(1.0, 0.3 + (matched_keywords / len(keywords)) * 0.7)
+        # 追加スコアも考慮
+            additional_score = min(0.3, (score - matched_keywords) * 0.3)
+            return min(1.0, base_score + additional_score)
+        else:
+            return 0.0
     
     def _generate_suggestions(self, category_scores: Dict[str, float]) -> List[str]:
         """改善提案を生成"""
