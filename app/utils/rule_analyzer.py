@@ -11,12 +11,16 @@ class RuleBasedAnalyzer:
                 'keywords': ['市場', 'ターゲット', '顧客', 'ニーズ', 'トレンド', '成長率'],
                 'weight': 0.2
             },
-            'competitor_analysis': {
-                'keywords': ['競合', '競合他社', '差別化', '強み', '弱み', 'シェア'],
+            'content_spec': {# 中身仕様
+                'keywords': ['品目', 'アルコール分', 'エキス分', '原料', '度数', '原材料'],
                 'weight': 0.2
             },
-            'risk_analysis': {
-                'keywords': ['リスク', '課題', '問題', '懸念', '対策', '予防'],
+            'container_spec': { # 容器仕様
+                'keywords': ['缶', 'びん', '樽', 'PET', '紙パック', '容器', 'ボトル'],
+                'weight': 0.2
+            },
+            'sales_method': { # 販売方法
+                'keywords': ['通年', '期間限定', 'エリア限定', '店舗限定', 'ネット販売', '販売方法'],
                 'weight': 0.2
             },
             'implementation': {
@@ -43,7 +47,7 @@ class RuleBasedAnalyzer:
             }
         
         # 重要キーワードのチェック（中程度判定の保証）
-        important_keywords = ['顧客', 'ターゲット', 'リスク', 'スケジュール', '計画']
+        important_keywords = ['顧客', 'ターゲット', 'スケジュール', '計画', '品目', 'アルコール', '缶', 'びん']
         has_important_keyword = any(keyword in text for keyword in important_keywords)
 
         # 各カテゴリのスコアを計算
@@ -111,16 +115,12 @@ class RuleBasedAnalyzer:
         # スコアが低いカテゴリについて提案を生成
         if category_scores.get('market_analysis', 0) < 0.5:
             suggestions.append('市場分析の詳細化が必要です')
-        
-        if category_scores.get('competitor_analysis', 0) < 0.5:
-            suggestions.append('競合分析の強化が必要です')
-        
-        if category_scores.get('business_model', 0) < 0.5:
-            suggestions.append('収益モデルの明確化が必要です')
-        
-        if category_scores.get('risk_analysis', 0) < 0.5:
-            suggestions.append('リスク分析の追加が必要です')
-        
+        if category_scores.get('content_spec', 0) < 0.5:
+            suggestions.append('中味仕様（品目・アルコール分等）の記載が必要です')
+        if category_scores.get('container_spec', 0) < 0.5:
+            suggestions.append('容器仕様（缶・びん等）の明記が必要です')
+        if category_scores.get('sales_method', 0) < 0.5:
+            suggestions.append('販売方法（通年・限定等）の記載が必要です')
         if category_scores.get('implementation', 0) < 0.5:
             suggestions.append('実行計画の具体化が必要です')
         

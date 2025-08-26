@@ -131,8 +131,8 @@ class AnalysisService:
         - 主な不足点: {', '.join(rule_result.get('suggestions', []))}
 
         【評価観点】
-        - 基本情報の有無: 商品・サービス / ターゲット顧客 / スケジュール・時期 / 目的・目標
-        - AI観点: 文章の論理構造の整合性、情報の具体性
+        - 基本情報の有無: 商品・サービス / ターゲット顧客 / スケジュール・時期 / 目的・目標 / 中味仕様 / 容器仕様 / 販売方法
+        - AI観点: ①情報の具体性, ②基本情報の充実度(原則2つ以上あればOK), ③文章の論理的整合性
 
         【出力スタイル（厳守）】
         - 一行サマリを先頭に。少し砕けた日本語で端的に（例: 「全体は悪くないけど、ターゲットと予算が曖昧かも」）。
@@ -163,7 +163,7 @@ class AnalysisService:
         rule_score = rule_result.get('completeness', 3)
         ai_score = ai_result.get('ai_score', 3) if ai_result else 3
         
-        # 重み付き平均（ルールベース: 0.7, AI: 0.3）
+        # 重み付き平均（ルールベース: 0.8, AI: 0.2）
         combined_score = rule_score * 0.8 + ai_score * 0.2
         final_score = max(2, int(round(combined_score)))
         
