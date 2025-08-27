@@ -45,6 +45,17 @@ class SimilarCasesService:
                 )
                 logger.info(f"全業種で {len(consultations)} 件の相談を取得")
             
+            # consultation_idの最大値の1件を除外
+            if len(consultations) > 1:
+                # consultation_idでソートして最大値を特定
+                consultations_sorted_by_id = sorted(consultations, key=lambda x: int(x['consultation_id']), reverse=True)
+                max_consultation_id = consultations_sorted_by_id[0]['consultation_id']
+                
+                # 最大consultation_idの案件を除外
+                consultations = [c for c in consultations if int(c['consultation_id']) != int(max_consultation_id)]
+                
+                logger.info(f"最大consultation_id {max_consultation_id} の1件を除外し、{len(consultations)} 件の相談案件で類似度計算を実行")
+            
             if not consultations:
                 logger.info("類似度計算対象の相談案件が見つかりませんでした")
                 return SimilarCasesResponse(
