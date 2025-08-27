@@ -63,3 +63,5 @@ app/services/mysql_service.py.backup_before_recommended_advisor_fix
 add_issue_question_pair_columns.py
 add_missing_columns.py
 debug_create_consultation.py
+remove_unused_columns.py
+remove_unused_columns_direct.py
