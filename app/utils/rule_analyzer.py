@@ -13,11 +13,23 @@ class RuleBasedAnalyzer:
             },
             'target_customer': {
                 'keywords': ['ターゲット', '顧客', '対象', 'ユーザー', 'ペルソナ', '年代', '購買動機', '価格帯'],
-                'weight': 0.25
+                'weight': 0.2
             },
             'schedule_timing': {
                 'keywords': ['スケジュール', '時期', '期日', '日程', '月', '週', 'いつ', '開始', '終了', 'リリース', '目標'],
-                'weight': 0.25
+                'weight': 0.2
+            },
+            'content_spec': {# 中身仕様
+                'keywords': ['品目', 'アルコール分', 'エキス分', '原料', '度数', '原材料'],
+                'weight': 0.2
+            },
+            'container_spec': { # 容器仕様
+                'keywords': ['缶', 'びん', '樽', 'PET', '紙パック', '容器', 'ボトル'],
+                'weight': 0.2
+            },
+            'sales_method': { # 販売方法
+                'keywords': ['通年', '期間限定', 'エリア限定', '店舗限定', 'ネット販売', '販売方法'],
+                'weight': 0.2
             },
             'purpose_goal': {
                 'keywords': ['目的', '目標', 'KPI', 'ゴール', '狙い', '意図', '売上', 'シェア', '成長'],
@@ -42,6 +54,9 @@ class RuleBasedAnalyzer:
                 'confidence': 1.0
             }
         
+        # 重要キーワードのチェック（中程度判定の保証）
+        important_keywords = ['顧客', 'ターゲット', 'スケジュール', '計画', '品目', 'アルコール', '缶', 'びん']
+        has_important_keyword = any(keyword in text for keyword in important_keywords)
         # 各カテゴリのスコアを計算
         category_scores = {}
         total_score = 0
@@ -124,6 +139,13 @@ class RuleBasedAnalyzer:
         
         if category_scores.get('schedule_timing', 0) < 0.5:
             suggestions.append('スケジュール・時期の明確化が必要です')
+        
+        if category_scores.get('content_spec', 0) < 0.5:
+            suggestions.append('中味仕様（品目・アルコール分等）の記載が必要です')
+        if category_scores.get('container_spec', 0) < 0.5:
+            suggestions.append('容器仕様（缶・びん等）の明記が必要です')
+        if category_scores.get('sales_method', 0) < 0.5:
+            suggestions.append('販売方法（通年・限定等）の記載が必要です')
         
         if category_scores.get('purpose_goal', 0) < 0.5:
             suggestions.append('目的・目標の明確化が必要です')
