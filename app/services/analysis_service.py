@@ -130,13 +130,23 @@ class AnalysisService:
         - 推定充実度: {rule_result.get('completeness', 'N/A')}/5
         - 主な不足点: {', '.join(rule_result.get('suggestions', []))}
 
+        【評価基準】
+        - レベル4: 4つの基本要素（商品・サービス、ターゲット、スケジュール、目的・目標）がすべて含まれ、具体的な内容がある
+        - レベル5: レベル4の条件に加えて、市場分析、競合分析、詳細な実行計画、リスク分析のいずれかが含まれている
+
+        【基本要素の確認】
+        1. 商品・サービス内容: 具体的な商品名、仕様、特徴
+        2. ターゲット顧客: 年代、属性、購買動機、価格帯
+        3. スケジュール・時期: リリース時期、目標達成時期
+        4. 目的・目標: 売上目標、シェア目標、成長目標
+
         【評価観点】
         - 基本情報の有無: 商品・サービス / ターゲット顧客 / スケジュール・時期 / 目的・目標 / 中味仕様 / 容器仕様 / 販売方法
         - AI観点: ①情報の具体性, ②基本情報の充実度(原則2つ以上あればOK), ③文章の論理的整合性
 
         【出力スタイル（厳守）】
-        - 一行サマリを先頭に。少し砕けた日本語で端的に（例: 「全体は悪くないけど、ターゲットと予算が曖昧かも」）。
-        - 続けて短い箇条書きで2〜3件の提案（例: 「ターゲット層の年代・属性を一言で」「概算予算のレンジ」「実施時期（月）」）。
+        - 一行サマリを先頭に。少し砕けた日本語で端的に。
+        - 続けて短い箇条書きで2〜3件の提案。
         - 合計200字以内。前置きや引用・記号は不要。JSONは出力しない。
         """
 
@@ -163,23 +173,35 @@ class AnalysisService:
         rule_score = rule_result.get('completeness', 3)
         ai_score = ai_result.get('ai_score', 3) if ai_result else 3
         
-        # 重み付き平均（ルールベース: 0.8, AI: 0.2）
-        combined_score = rule_score * 0.8 + ai_score * 0.2
-        final_score = max(2, int(round(combined_score)))
+        # より寛容な重み付き平均（ルールベース: 0.6, AI: 0.4）
+        combined_score = rule_score * 0.6 + ai_score * 0.4
+        
+        # ルールベースの結果を重視しつつ、AIの補正を適用
+        if rule_score >= 4:
+            # ルールベースで4以上の場合、AIの補正で5に上げる可能性を考慮
+            final_score = min(5, max(rule_score, int(round(combined_score))))
+        else:
+            # ルールベースが4未満の場合、より寛容に評価
+            final_score = max(rule_score, int(round(combined_score)))
         
         # 提案を統合
         suggestions = []
         if ai_result and ai_result.get('ai_suggestions'):
             suggestions.extend(ai_result['ai_suggestions'])
+        else:
+            # AI分析がない場合はルールベースの提案を使用
+            suggestions.extend(rule_result.get('suggestions', []))
 
-        # より寛容な基準での追加提案
-        if final_score < 4:
-            if 'ターゲット' not in (rule_result.get('suggestions', [])[0] if rule_result.get('suggestions') else ''):
-                suggestions.append("ターゲット層をもう少し具体化できそうです")
+        # レベル5に到達するための追加提案
+        if final_score < 5:
+            if '市場分析' not in ' '.join(suggestions):
+                suggestions.append("市場分析の詳細化でさらに充実します")
+            if '競合' not in ' '.join(suggestions):
+                suggestions.append("競合分析の強化で差別化が明確になります")
         
         # 信頼度を統合
-        confidence = min(1.0, rule_result.get('confidence', 0.8) * 0.8 + 
-                        (ai_result.get('confidence', 0.5) if ai_result else 0.5) * 0.2)
+        confidence = min(1.0, rule_result.get('confidence', 0.8) * 0.7 + 
+                        (ai_result.get('confidence', 0.5) if ai_result else 0.5) * 0.3)
         
         return AnalysisResponse(
             completeness=final_score,

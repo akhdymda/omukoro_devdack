@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     mongo_collection: str = "alctax_act_chunks"
     mongo_timeout: int = 10
     
+    # Gremlin設定（オプショナル）
+    gremlin_endpoint: Optional[str] = None
+    gremlin_auth_key: Optional[str] = None
+    gremlin_database: Optional[str] = None
+    gremlin_graph: Optional[str] = None
+    
     # ログ設定
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

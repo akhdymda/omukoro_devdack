@@ -17,6 +17,13 @@ from app.api.analysis import router as analysis_router
 from app.api.consultations import router as consultations_router
 from app.api.health import router as health_router
 from app.api.similar_cases import router as similar_cases_router
+from app.api.hybrid_search import router as hybrid_search_router
+from app.api.rag_comparison import router as rag_comparison_router
+from app.api.graph_search import router as graph_search_router
+from app.api.related_nodes import router as related_nodes_router
+from app.api.node_count import router as node_count_router
+from app.api.nodes_info import router as nodes_info_router
+from app.api.hybrid_rag import router as hybrid_rag_router
 
 # 環境変数を読み込み
 load_dotenv()
@@ -66,6 +73,13 @@ app.include_router(analysis_router, prefix="/api", tags=["analysis"])
 app.include_router(consultations_router, prefix="/api", tags=["consultations"])
 app.include_router(health_router, prefix="/api", tags=["health"])
 app.include_router(similar_cases_router, prefix="/api", tags=["similar_cases"])
+app.include_router(hybrid_search_router, prefix="/api", tags=["hybrid_search"])
+app.include_router(rag_comparison_router, prefix="/api", tags=["rag_comparison"])
+app.include_router(graph_search_router, prefix="/api", tags=["graph_search"])
+app.include_router(related_nodes_router, prefix="/api", tags=["related_nodes"])
+app.include_router(node_count_router, prefix="/api", tags=["node_count"])
+app.include_router(nodes_info_router, prefix="/api", tags=["nodes_info"])
+app.include_router(hybrid_rag_router, prefix="/api", tags=["hybrid_rag"])
 
 @app.get("/")
 async def root():
