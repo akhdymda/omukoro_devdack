@@ -20,3 +20,5 @@ rank-bm25
 nltk
 numpy<2.0.0
 scikit-learn
+# Gremlin接続用
+gremlinpython==3.7.1

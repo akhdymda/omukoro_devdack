@@ -1,0 +1,40 @@
+# Azure Cosmos DB Gremlin API 接続設定
+# このファイルを .env にコピーして、実際の値を設定してください
+
+# Azure Cosmos DB アカウント設定
+AZURE_COSMOS_ACCOUNT_NAME=your_cosmos_account_name
+AZURE_COSMOS_DATABASE_NAME=your_database_name
+AZURE_GREMLIN_GRAPH_NAME=your_graph_name
+
+# Gremlin接続設定
+AZURE_GREMLIN_ENDPOINT=https://your_cosmos_account_name.gremlin.cosmos.azure.com:443
+AZURE_GREMLIN_PORT=443
+AZURE_GREMLIN_SSL_ENABLED=true
+
+# 認証設定
+AZURE_COSMOS_PRIMARY_KEY=your_primary_key
+AZURE_COSMOS_SECONDARY_KEY=your_secondary_key
+
+# パフォーマンス設定
+AZURE_GREMLIN_MAX_CONNECTIONS=10
+AZURE_GREMLIN_CONNECTION_TIMEOUT=30000
+AZURE_GREMLIN_READ_TIMEOUT=30000
+
+# パーティションキー設定
+AZURE_GREMLIN_PARTITION_KEY=type
+
+# インデックス設定
+AZURE_GREMLIN_INDEX_STRATEGY=consistent
+
+# ログ設定
+AZURE_GREMLIN_LOG_LEVEL=INFO
+AZURE_GREMLIN_ENABLE_QUERY_LOGGING=false
+
+# 開発環境設定
+ENVIRONMENT=development
+DEBUG_MODE=true
+
+
+
+
+
